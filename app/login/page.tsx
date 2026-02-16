@@ -25,11 +25,14 @@ export default function LoginPage() {
             .single()
 
         if (data) {
-            localStorage.setItem('gorilla_user', JSON.stringify({
+            // CAMBIO AQUÍ: Usamos sessionStorage en lugar de localStorage
+            sessionStorage.setItem('gorilla_user', JSON.stringify({
                 cedula: data.cedula,
                 nombre: data.nombre,
                 rol: data.rol
             }))
+
+            // Redirección
             router.push(data.rol === 'administrador' ? '/admin/resumen' : '/operativo/nuevo-servicio')
         } else {
             setError('Cédula no registrada. Contacta al admin.')
@@ -38,8 +41,8 @@ export default function LoginPage() {
     }
 
     return (
-        <div className="min-h-screen bg-[#0a0a0c] flex flex-col items-center justify-center p-6 relative overflow-hidden">
-            
+        <div className="min-h-screen w-full bg-[#0E0C15] flex flex-col items-center justify-center p-6 relative overflow-hidden z-50">
+
             {/* FONDO DECORATIVO AVANZADO */}
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
                 <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[50%] bg-gorilla-orange/20 rounded-full blur-[120px] animate-pulse" />
@@ -48,7 +51,7 @@ export default function LoginPage() {
                 <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'radial-gradient(#fff 1px, transparent 1px)', backgroundSize: '30px 30px' }} />
             </div>
 
-            <motion.div 
+            <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.8 }}
@@ -57,14 +60,14 @@ export default function LoginPage() {
                 {/* LOGO CON GLOW DINÁMICO */}
                 <div className="flex justify-center mb-12">
                     <div className="relative">
-                        <motion.div 
+                        <motion.div
                             animate={{ scale: [1, 1.05, 1] }}
                             transition={{ repeat: Infinity, duration: 4 }}
                             className="absolute -inset-4 bg-gradient-to-r from-gorilla-orange/50 to-gorilla-purple/50 rounded-full blur-2xl opacity-30"
                         ></motion.div>
                         <div className="relative bg-[#121216] border border-white/10 rounded-full p-4 shadow-2xl">
                             <Image
-                                src="/logo.png"
+                                src="/LogoFondo.png"
                                 alt="Gorilla Wash Logo"
                                 width={140}
                                 height={140}
@@ -106,7 +109,7 @@ export default function LoginPage() {
 
                         <AnimatePresence>
                             {error && (
-                                <motion.div 
+                                <motion.div
                                     initial={{ opacity: 0, scale: 0.9 }}
                                     animate={{ opacity: 1, scale: 1 }}
                                     exit={{ opacity: 0 }}
@@ -142,7 +145,7 @@ export default function LoginPage() {
                 </div>
 
                 {/* FOOTER */}
-                <motion.div 
+                <motion.div
                     initial={{ opacity: 0 }}
                     animate={{ opacity: 1 }}
                     transition={{ delay: 1 }}

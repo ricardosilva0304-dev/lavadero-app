@@ -1,34 +1,38 @@
 @import "tailwindcss";
 
 @theme {
-  /* Definimos tus colores Gorilla aquí para que Tailwind los reconozca */
   --color-gorilla-dark: #0E0C15;
   --color-gorilla-orange: #F47F20;
   --color-gorilla-purple: #8B5CF6;
-
-  /* Animación personalizada */
   --animate-spin-slow: spin 3s linear infinite;
 }
 
-/* Estilos base */
+/* Estilos base CLAROS para el contenido */
 body {
-  background-color: var(--color-gorilla-dark);
-  color: white;
+  background-color: #F3F4F6; /* Gris muy suave */
+  color: #111827; /* Gris casi negro para texto */
   font-family: Arial, Helvetica, sans-serif;
 }
 
-/* Scrollbar personalizada */
+/* Scrollbar */
 ::-webkit-scrollbar {
   width: 8px;
 }
-
 ::-webkit-scrollbar-track {
-  background: var(--color-gorilla-dark);
+  background: #E5E7EB;
 }
-
 ::-webkit-scrollbar-thumb {
   background: var(--color-gorilla-orange);
   border-radius: 10px;
+}
+
+/* Ocultar scrollbar pero permitir scroll */
+.scrollbar-hide::-webkit-scrollbar {
+    display: none;
+}
+.scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
 }
 
 @media print {

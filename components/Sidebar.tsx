@@ -6,7 +6,7 @@ import Image from 'next/image'
 import { 
   LayoutDashboard, Settings, Car, Clock, 
   Users, Package, LogOut, Menu, X, PlusCircle,
-  UserCircle, ChevronRight, Zap
+  UserCircle
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -25,21 +25,42 @@ export default function Sidebar() {
   const pathname = usePathname()
   const router = useRouter()
 
-  useEffect(() => {
-    const userData = localStorage.getItem('gorilla_user')
-    if (userData) setUser(JSON.parse(userData))
-  }, [])
-
+  // 1. Si estamos en login, no mostrar sidebar
   if (pathname === '/login' || pathname === '/') return null
 
+  // 2. PROTECCIÓN DE RUTA (Seguridad)
+  useEffect(() => {
+    // Intentamos leer el usuario de la sesión temporal
+    const userData = sessionStorage.getItem('gorilla_user')
+    
+    if (!userData) {
+      // Si no hay datos (porque recargó la página o entró directo), lo expulsamos
+      router.push('/login')
+    } else {
+      setUser(JSON.parse(userData))
+    }
+
+    // OPCIONAL: Si quieres ser EXTREMAMENTE estricto y que al dar F5 se borre todo:
+    // Descomenta las siguientes 3 líneas:
+    /*
+    const handleUnload = () => sessionStorage.clear()
+    window.addEventListener('beforeunload', handleUnload)
+    return () => window.removeEventListener('beforeunload', handleUnload)
+    */
+
+  }, [router])
+
   const handleLogout = () => {
-    localStorage.removeItem('gorilla_user')
+    sessionStorage.removeItem('gorilla_user')
     router.push('/login')
   }
 
+  // Si no hay usuario cargado aún, no mostramos nada para evitar parpadeos
+  if (!user) return null
+
   return (
     <>
-      {/* BOTÓN MÓVIL (FLOTANTE CON GLOW) */}
+      {/* BOTÓN MÓVIL */}
       <button 
         onClick={() => setIsOpen(!isOpen)}
         className="lg:hidden fixed bottom-6 right-6 z-[60] p-4 bg-gorilla-orange rounded-full text-white shadow-[0_10px_30px_rgba(244,127,32,0.4)] border border-white/20 active:scale-90 transition-transform"
@@ -47,7 +68,7 @@ export default function Sidebar() {
         {isOpen ? <X size={28} /> : <Menu size={28} />}
       </button>
 
-      {/* OVERLAY GLASS */}
+      {/* OVERLAY */}
       <AnimatePresence>
         {isOpen && (
           <motion.div 
@@ -60,7 +81,7 @@ export default function Sidebar() {
         )}
       </AnimatePresence>
 
-      {/* SIDEBAR CONTAINER */}
+      {/* SIDEBAR */}
       <aside className={`
         fixed top-0 left-0 h-full z-[55]
         w-72 bg-[#0B0910]/95 backdrop-blur-2xl border-r border-white/5
@@ -69,29 +90,20 @@ export default function Sidebar() {
       `}>
         <div className="flex flex-col h-full relative">
           
-          {/* LUZ DECORATIVA SUPERIOR */}
           <div className="absolute top-0 left-0 w-full h-32 bg-gradient-to-b from-gorilla-orange/10 to-transparent pointer-events-none" />
 
-          {/* SECCIÓN LOGO */}
+          {/* LOGO */}
           <div className="px-8 pt-10 pb-12 flex flex-col items-center">
             <motion.div 
-              animate={{ 
-                boxShadow: ["0 0 20px rgba(244,127,32,0.1)", "0 0 40px rgba(244,127,32,0.3)", "0 0 20px rgba(244,127,32,0.1)"]
-              }}
+              animate={{ boxShadow: ["0 0 20px rgba(244,127,32,0.1)", "0 0 40px rgba(244,127,32,0.3)", "0 0 20px rgba(244,127,32,0.1)"] }}
               transition={{ repeat: Infinity, duration: 3 }}
               className="relative w-28 h-28 mb-4 rounded-full border border-white/10 p-2 bg-[#121216]"
             >
-              <Image 
-                src="/logo.png"
-                alt="Gorilla Logo" 
-                width={100}
-                height={100}
-                className="object-contain"
-              />
+              <Image src="/LogoFondo.png" alt="Gorilla Logo" width={100} height={100} className="object-contain" />
             </motion.div>
             <div className="text-center">
                 <h2 className="text-white font-black italic text-2xl tracking-tighter leading-none">
-                  GORILLA<span className="text-gorilla-orange">WASH</span>
+                  ECOPLANET<span className="text-gorilla-orange">KONG</span>
                 </h2>
                 <div className="flex items-center gap-1 justify-center mt-1">
                     <div className="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse" />
@@ -100,7 +112,7 @@ export default function Sidebar() {
             </div>
           </div>
 
-          {/* MENÚ DE NAVEGACIÓN */}
+          {/* MENÚ */}
           <nav className="flex-1 px-4 space-y-2 overflow-y-auto scrollbar-hide">
             <p className="px-4 text-[10px] font-black text-gray-600 uppercase tracking-[0.4em] mb-4">Menú Principal</p>
             {menuItems.map((item) => {
@@ -122,23 +134,15 @@ export default function Sidebar() {
                 >
                   <Icon size={20} className={isActive ? 'scale-110' : 'group-hover:scale-110 transition-transform'} />
                   {item.label}
-                  {isActive && (
-                    <motion.div 
-                        layoutId="activeTab"
-                        className="absolute right-4 w-1.5 h-1.5 bg-white rounded-full shadow-[0_0_10px_white]" 
-                    />
-                  )}
+                  {isActive && <motion.div layoutId="activeTab" className="absolute right-4 w-1.5 h-1.5 bg-white rounded-full shadow-[0_0_10px_white]" />}
                 </Link>
               )
             })}
           </nav>
 
-          {/* FOOTER: USUARIO Y LOGOUT */}
+          {/* FOOTER */}
           <div className="p-6 mt-auto">
             <div className="bg-white/[0.03] border border-white/10 rounded-[2rem] p-4 relative overflow-hidden group">
-              {/* Efecto de luz al pasar el mouse */}
-              <div className="absolute -inset-1 bg-gradient-to-r from-gorilla-orange/20 to-gorilla-purple/20 opacity-0 group-hover:opacity-100 transition-opacity blur" />
-              
               <div className="relative flex items-center gap-3">
                 <div className="w-10 h-10 rounded-xl bg-gorilla-purple/20 flex items-center justify-center text-gorilla-purple">
                   <UserCircle size={24} />
@@ -151,11 +155,7 @@ export default function Sidebar() {
                     {user?.rol || 'Staff'}
                   </p>
                 </div>
-                <button 
-                  onClick={handleLogout}
-                  className="p-2 text-gray-500 hover:text-red-500 transition-colors"
-                  title="Cerrar Sesión"
-                >
+                <button onClick={handleLogout} className="p-2 text-gray-500 hover:text-red-500 transition-colors" title="Cerrar Sesión">
                   <LogOut size={18} />
                 </button>
               </div>
