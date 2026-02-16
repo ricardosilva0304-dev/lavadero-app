@@ -102,8 +102,19 @@ export default function NuevoServicioPage() {
     const { data, error } = await supabase.from('ordenes_servicio').insert([nuevaOrden]).select().single()
 
     if (!error) {
-      setOrdenFinalizada({ ...nuevaOrden, id_ticket: data.id.split('-')[0], fecha: new Date() })
-      setTimeout(() => { window.print() }, 500)
+      // 1. Guardamos la info para el tiquete
+      setOrdenFinalizada({
+        placa: placa.toUpperCase(),
+        tipo_vehiculo: tipoVehiculo,
+        id_ticket: data.id.split('-')[0],
+        fecha: new Date().toISOString()
+      })
+
+      // 2. Esperamos a que React renderice los datos en el tiquete oculto
+      setTimeout(() => {
+        window.print();
+        // 3. Después de mandar a imprimir, limpiamos o mostramos el modal de éxito
+      }, 800); // 800ms es suficiente para que el DOM se actualice
     }
     setLoading(false)
   }
@@ -111,18 +122,44 @@ export default function NuevoServicioPage() {
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900 p-4 md:p-10 pb-40 relative">
 
-      {/* TICKET IMPRESIÓN (Invisible) */}
-      <div id="ticket-impresion" className="hidden text-black p-4 font-mono text-sm leading-tight w-[80mm]">
-        {/* ... (Mismo contenido de ticket, no cambia porque es para imprimir) ... */}
+      {/* 1. TICKET PARA IMPRESIÓN */}
+      <div
+        id="ticket-impresion"
+        className="fixed top-0 left-0 bg-white text-black p-4 font-mono text-xs w-[80mm] pointer-events-none opacity-0"
+        style={{ zIndex: -1 }} // Lo mantenemos en el DOM pero invisible para el usuario
+      >
         <div className="text-center mb-4 border-b border-dashed border-black pb-2">
-          <h2 className="text-xl font-bold mt-2">GORILLA WASH</h2>
+          {/* Usamos una img normal para evitar problemas de optimización de Next Image en impresión */}
+          <img src="/logo.png" alt="Logo" className="w-16 h-16 mx-auto" style={{ filter: 'grayscale(1) contrast(2)' }} />
+          <h2 className="text-lg font-bold mt-2 uppercase">Ecoplanet Kong</h2>
+          <p className="text-[10px]">Servicio Automotriz Pro</p>
         </div>
+
         <div className="mb-4">
-          <p>FECHA: {ordenFinalizada?.fecha.toLocaleString()}</p>
-          <p>TICKET: #{ordenFinalizada?.id_ticket}</p>
+          <p>FECHA: {ordenFinalizada?.fecha ? new Date(ordenFinalizada.fecha).toLocaleString() : ''}</p>
+          <p>TICKET: #{ordenFinalizada?.id_ticket || '000'}</p>
           <p className="font-bold text-lg">PLACA: {ordenFinalizada?.placa}</p>
+          <p className="uppercase">Vehículo: {ordenFinalizada?.tipo_vehiculo}</p>
         </div>
-        {/* ... resto del ticket ... */}
+
+        <div className="border-y border-dashed border-black py-2 my-2">
+          <p className="font-bold mb-1">SERVICIOS:</p>
+          {serviciosSeleccionados.map((s, i) => (
+            <div key={i} className="flex justify-between">
+              <span>- {s.nombre}</span>
+              <span>${(tipoVehiculo === 'carro' ? s.precio_carro : s.precio_moto).toLocaleString()}</span>
+            </div>
+          ))}
+        </div>
+
+        <div className="text-right font-bold text-base mt-2">
+          TOTAL: ${totalOrden.toLocaleString()}
+        </div>
+
+        <div className="text-center mt-6 text-[9px] uppercase border-t border-dashed border-black pt-4">
+          <p>¡Gracias por su confianza!</p>
+          <p>Conserve este tiquete.</p>
+        </div>
       </div>
 
       {/* INTERFAZ VISUAL CLARA */}
