@@ -35,47 +35,6 @@ body {
     scrollbar-width: none;
 }
 
-@media print {
-  /* 1. Forzar fondo blanco y texto negro */
-  html, body {
-    background-color: white !important;
-    color: black !important;
-    margin: 0 !important;
-    padding: 0 !important;
-  }
-
-  /* 2. ESCONDER ABSOLUTAMENTE TODO */
-  body > * {
-    display: none !important;
-  }
-
-  /* 3. MOSTRAR ÚNICAMENTE EL TIQUETE */
-  #ticket-impresion {
-    display: block !important;
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
-    width: 100% !important;
-    margin: 0 !important;
-    padding: 10px !important;
-    visibility: visible !important;
-  }
-
-  /* Asegurar que los hijos del tiquete también se vean */
-  #ticket-impresion * {
-    display: block !important;
-    visibility: visible !important;
-    color: black !important;
-  }
-
-  /* Quitar encabezados y pies de página del navegador (fecha, url) */
-  @page {
-    margin: 0;
-  }
-}
-
-/* app/globals.css */
-
 @keyframes gradient-x {
   0% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
