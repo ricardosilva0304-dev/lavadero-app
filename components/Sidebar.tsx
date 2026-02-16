@@ -6,17 +6,20 @@ import Image from 'next/image'
 import { 
   LayoutDashboard, Settings, Car, Clock, 
   Users, Package, LogOut, Menu, X, PlusCircle,
-  UserCircle, ListChecks
+  UserCircle, ListChecks, Activity, History, BarChart3
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 // Definición de ítems por rol
 const adminItems = [
   { label: 'Resumen', href: '/admin/resumen', icon: LayoutDashboard, color: 'orange' },
+  { label: 'Historial', href: '/admin/historial', icon: History, color: 'orange' }, // Nueva
+  { label: 'Monitoreo Empleados', href: '/admin/monitoreo', icon: Activity, color: 'orange' }, // Nueva
   { label: 'Nuevo Servicio', href: '/operativo/nuevo-servicio', icon: PlusCircle, color: 'orange' },
   { label: 'Parqueadero', href: '/operativo/parqueadero', icon: Clock, color: 'orange' },
   { label: 'Inventario', href: '/admin/inventario', icon: Package, color: 'purple' },
   { label: 'Base Clientes', href: '/admin/clientes', icon: Users, color: 'purple' },
+  { label: 'Reportes', href: '/admin/reportes', icon: BarChart3, color: 'purple' },
   { label: 'Configuración', href: '/admin/configuracion', icon: Settings, color: 'purple' },
 ]
 

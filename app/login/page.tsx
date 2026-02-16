@@ -32,8 +32,11 @@ export default function LoginPage() {
                 rol: data.rol
             }))
 
-            // Redirección
-            router.push(data.rol === 'administrador' ? '/admin/resumen' : '/operativo/nuevo-servicio')
+            if (data.rol === 'administrador') {
+                router.push('/admin/resumen')
+            } else {
+                router.push('/operativo') // <--- Esta debe ser su casa
+            }
         } else {
             setError('Cédula no registrada. Contacta al admin.')
         }
