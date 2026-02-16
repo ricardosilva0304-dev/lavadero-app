@@ -99,7 +99,7 @@ export default function Sidebar() {
               transition={{ repeat: Infinity, duration: 3 }}
               className="relative w-28 h-28 mb-4 rounded-full border border-white/10 p-2 bg-[#121216]"
             >
-              <Image src="/LogoFondo.png" alt="Gorilla Logo" width={100} height={100} className="object-contain" />
+              <Image src="/logo.png" alt="Gorilla Logo" width={100} height={100} className="object-contain" />
             </motion.div>
             <div className="text-center">
                 <h2 className="text-white font-black italic text-2xl tracking-tighter leading-none">

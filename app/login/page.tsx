@@ -67,7 +67,7 @@ export default function LoginPage() {
                         ></motion.div>
                         <div className="relative bg-[#121216] border border-white/10 rounded-full p-4 shadow-2xl">
                             <Image
-                                src="/LogoFondo.png"
+                                src="/logo.png"
                                 alt="Gorilla Wash Logo"
                                 width={140}
                                 height={140}
