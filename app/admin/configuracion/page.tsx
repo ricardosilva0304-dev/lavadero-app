@@ -18,7 +18,10 @@ export default function ConfiguracionPage() {
   // Datos de la DB
   const [servicios, setServicios] = useState<any[]>([])
   const [usuarios, setUsuarios] = useState<any[]>([])
-  const [tarifas, setTarifas] = useState({ carro: 0, moto: 0 })
+  const [tarifas, setTarifas] = useState<any>({
+    carro: { precio_hora: 0, precio_noche: 0, precio_dia: 0, precio_mes: 0 },
+    moto: { precio_hora: 0, precio_noche: 0, precio_dia: 0, precio_mes: 0 }
+  })
 
   // Estados de Edición
   const [editandoUser, setEditandoUser] = useState<string | null>(null)
@@ -41,14 +44,14 @@ export default function ConfiguracionPage() {
     setUsuarios(usr || [])
 
     if (trf) {
-      // Corrección de indexado para TypeScript
-      const tMap: { [key: string]: number } = { carro: 0, moto: 0 }
-      trf.forEach((t: any) => {
-        if (t.tipo_vehiculo === 'carro' || t.tipo_vehiculo === 'moto') {
-          tMap[t.tipo_vehiculo] = t.precio_hora
-        }
+      // Buscamos los datos específicos de cada vehículo o usamos un objeto vacío si no existen
+      const carData = trf.find(t => t.tipo_vehiculo === 'carro') || {}
+      const motoData = trf.find(t => t.tipo_vehiculo === 'moto') || {}
+
+      setTarifas({
+        carro: carData,
+        moto: motoData
       })
-      setTarifas({ carro: tMap.carro, moto: tMap.moto })
     }
     setLoading(false)
   }
@@ -252,14 +255,14 @@ export default function ConfiguracionPage() {
                     <TarifaCard
                       tipo="carro"
                       icono={<Car size={40} />}
-                      valor={tarifas.carro}
-                      onSave={(v: any) => actualizarTarifa('carro', v)}
+                      valores={tarifas.carro} // <--- Asegúrate que diga valores
+                      onSave={(tipo: any, v: any) => actualizarTarifa('carro', v)}
                     />
                     <TarifaCard
                       tipo="moto"
                       icono={<Bike size={40} />}
-                      valor={tarifas.moto}
-                      onSave={(v: any) => actualizarTarifa('moto', v)}
+                      valores={tarifas.moto} // <--- Asegúrate que diga valores
+                      onSave={(tipo: any, v: any) => actualizarTarifa('moto', v)}
                     />
                   </div>
                   <div className="p-8 bg-blue-50 rounded-[2.5rem] border border-blue-100 flex items-start gap-4">
@@ -304,11 +307,12 @@ function TarifaCard({ tipo, icono, valores, onSave }: any) {
   const [saved, setSaved] = useState(false)
 
   useEffect(() => {
+    // Añadimos valores?. para que si es undefined no de error
     setVals({
-      hora: valores.precio_hora || 0,
-      noche: valores.precio_noche || 0,
-      dia: valores.precio_dia || 0,
-      mes: valores.precio_mes || 0
+      hora: valores?.precio_hora || 0,
+      noche: valores?.precio_noche || 0,
+      dia: valores?.precio_dia || 0,
+      mes: valores?.precio_mes || 0
     })
   }, [valores])
 
