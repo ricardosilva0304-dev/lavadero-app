@@ -84,7 +84,7 @@ export default function LoginPage() {
 
                     <div className="text-center mb-10">
                         <h1 className="text-white text-4xl font-black tracking-tighter mb-2">
-                            GORILLA <span className="text-transparent bg-clip-text bg-gradient-to-r from-gorilla-orange to-orange-400">WASH</span>
+                            ECOPLANET <span className="text-transparent bg-clip-text bg-gradient-to-r from-gorilla-orange to-orange-400">KONG</span>
                         </h1>
                         <p className="text-gray-500 font-medium tracking-wide text-sm uppercase">Sistema de Gestión Pro</p>
                     </div>
