@@ -2,138 +2,213 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { 
-  BarChart3, Download, Package, AlertTriangle, 
-  TrendingUp, ArrowDownCircle, FileSpreadsheet, Printer
+  FileText, Package, Clock, BarChart3, 
+  Search, Printer, ChevronRight, DollarSign,
+  Car, Coffee, History, Filter
 } from 'lucide-react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 
 export const dynamic = 'force-dynamic'
 
 export default function ReportesPage() {
   const supabase = createClient()
-  const [productos, setProductos] = useState<any[]>([])
-  const [stats, setStats] = useState({ valorInventario: 0, itemsBajos: 0 })
+  const [activeTab, setActiveTab] = useState<'ventas' | 'inventario' | 'parqueadero'>('ventas')
+  const [data, setData] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [filtro, setFiltro] = useState('')
 
   useEffect(() => {
-    fetchInventoryReport()
-  }, [])
+    fetchReporte()
+  }, [activeTab])
 
-  const fetchInventoryReport = async () => {
-    const { data } = await supabase.from('productos').select('*').order('stock')
-    if (data) {
-      const valor = data.reduce((acc, p) => acc + (p.precio_venta * p.stock), 0)
-      const bajos = data.filter(p => p.stock <= p.stock_minimo).length
-      setProductos(data)
-      setStats({ valorInventario: valor, itemsBajos: bajos })
+  const fetchReporte = async () => {
+    setLoading(true)
+    let query;
+
+    if (activeTab === 'ventas') {
+      query = supabase.from('ordenes_servicio').select('*, perfiles(nombre)').order('creado_en', { ascending: false })
+    } else if (activeTab === 'inventario') {
+      query = supabase.from('productos').select('*').order('stock', { ascending: true })
+    } else {
+      query = supabase.from('parqueadero_registros').select('*').eq('estado', 'finalizado').order('hora_salida', { ascending: false })
     }
+
+    const { data: res } = await query
+    setData(res || [])
+    setLoading(false)
   }
 
-  const exportarCSV = () => {
-    const encabezados = ["Producto", "Stock", "Precio Venta", "Valor Total"]
-    const filas = productos.map(p => [p.nombre, p.stock, p.precio_venta, p.stock * p.precio_venta])
-    const csvContent = "data:text/csv;charset=utf-8," + [encabezados, ...filas].map(e => e.join(",")).join("\n")
-    const encodedUri = encodeURI(csvContent)
-    const link = document.createElement("a")
-    link.setAttribute("href", encodedUri)
-    link.setAttribute("download", `inventario_gorilla_${new Date().toLocaleDateString()}.csv`)
-    document.body.appendChild(link)
-    link.click()
-  }
+  // Filtro inteligente según la placa o nombre del producto
+  const dataFiltrada = data.filter(item => {
+    const textoBusqueda = filtro.toLowerCase()
+    return (
+      (item.placa?.toLowerCase().includes(textoBusqueda)) ||
+      (item.nombre?.toLowerCase().includes(textoBusqueda)) ||
+      (item.nombres_servicios?.toLowerCase().includes(textoBusqueda))
+    )
+  })
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6 md:p-10">
-      <div className="max-w-7xl mx-auto space-y-10">
+    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 p-4 md:p-10 pb-20">
+      <div className="max-w-7xl mx-auto">
         
-        <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
+        {/* HEADER */}
+        <header className="mb-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
           <div>
-            <h1 className="text-3xl font-black italic uppercase text-gray-900 tracking-tighter">
-              Auditoría & <span className="text-gorilla-purple">Reportes</span>
+            <div className="flex items-center gap-3 mb-2">
+                <div className="h-1 w-12 bg-gorilla-purple rounded-full" />
+                <span className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-400">Data & Auditoría</span>
+            </div>
+            <h1 className="text-5xl font-black tracking-tighter uppercase italic text-slate-900 leading-none">
+              Reportes <span className="text-gorilla-purple">Flash</span>
             </h1>
-            <p className="text-gray-400 text-xs font-bold uppercase tracking-widest mt-1">Control de activos e inventario</p>
           </div>
-          <button 
-            onClick={() => window.print()}
-            className="flex items-center gap-2 bg-white border border-gray-200 px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest hover:bg-gray-50 shadow-sm transition-all"
-          >
-            <Printer size={16}/> Imprimir Snapshot
-          </button>
+
+          <div className="flex bg-white p-1.5 rounded-[2rem] shadow-xl border border-slate-100 w-full md:w-auto">
+            <ReportTab label="Servicios" icon={<FileText size={16}/>} active={activeTab === 'ventas'} onClick={() => setActiveTab('ventas')} />
+            <ReportTab label="Inventario" icon={<Package size={16}/>} active={activeTab === 'inventario'} onClick={() => setActiveTab('inventario')} />
+            <ReportTab label="Parqueo" icon={<Clock size={16}/>} active={activeTab === 'parqueadero'} onClick={() => setActiveTab('parqueadero')} />
+          </div>
         </header>
 
-        {/* RESUMEN DE INVENTARIO */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <motion.div initial={{y:20, opacity:0}} animate={{y:0, opacity:1}} className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-xl shadow-gray-200/50">
-            <div className="w-12 h-12 bg-purple-50 rounded-2xl flex items-center justify-center text-gorilla-purple mb-4">
-              <Package size={24}/>
+        {/* BARRA DE BÚSQUEDA Y ACCIONES */}
+        <div className="flex flex-col md:flex-row gap-4 mb-8">
+            <div className="relative flex-1 group">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-gorilla-purple transition-colors" size={20} />
+                <input 
+                    placeholder="Filtrar por placa, servicio o producto..." 
+                    className="w-full bg-white border border-slate-200 p-5 pl-14 rounded-3xl outline-none focus:ring-4 focus:ring-purple-500/10 font-bold shadow-sm transition-all"
+                    value={filtro}
+                    onChange={(e) => setFiltro(e.target.value)}
+                />
             </div>
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Valor en Estantería</p>
-            <p className="text-4xl font-black text-gray-900">${stats.valorInventario.toLocaleString()}</p>
-          </motion.div>
-
-          <motion.div initial={{y:20, opacity:0}} animate={{y:0, opacity:1}} transition={{delay:0.1}} className="bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-xl shadow-gray-200/50">
-            <div className="w-12 h-12 bg-red-50 rounded-2xl flex items-center justify-center text-red-500 mb-4">
-              <AlertTriangle size={24}/>
-            </div>
-            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">Items por Agotarse</p>
-            <p className="text-4xl font-black text-gray-900">{stats.itemsBajos}</p>
-          </motion.div>
-
-          <div className="flex flex-col gap-4">
             <button 
-              onClick={exportarCSV}
-              className="flex-1 bg-gray-900 text-white rounded-[2rem] p-6 flex items-center justify-center gap-4 hover:bg-black transition-all shadow-xl group"
+                onClick={() => window.print()}
+                className="bg-slate-900 text-white px-8 py-5 rounded-3xl font-black flex items-center justify-center gap-3 shadow-xl hover:bg-black transition-all active:scale-95"
             >
-              <div className="bg-white/10 p-3 rounded-xl group-hover:scale-110 transition-transform">
-                <FileSpreadsheet size={24}/>
-              </div>
-              <div className="text-left">
-                <p className="font-black italic uppercase leading-none">Exportar CSV</p>
-                <p className="text-[9px] text-gray-400 uppercase font-bold mt-1 tracking-widest">Excel / Google Sheets</p>
-              </div>
+                <Printer size={20}/> IMPRIMIR VISTA
             </button>
-          </div>
         </div>
 
-        {/* TABLA DE INVENTARIO ACTUAL */}
-        <div className="bg-white border border-gray-200 rounded-[2.5rem] shadow-xl overflow-hidden">
-          <div className="p-8 border-b border-gray-100 flex justify-between items-center bg-gray-50/50">
-            <h2 className="font-black italic uppercase tracking-tighter text-gray-800 flex items-center gap-2 text-xl">
-              <BarChart3 size={20} className="text-gorilla-purple" /> Estado de Existencias
-            </h2>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left border-collapse">
-              <thead>
-                <tr className="bg-gray-50">
-                  <th className="p-6 text-[10px] font-black uppercase text-gray-400 tracking-widest">Producto</th>
-                  <th className="p-6 text-[10px] font-black uppercase text-gray-400 tracking-widest">Stock Actual</th>
-                  <th className="p-6 text-[10px] font-black uppercase text-gray-400 tracking-widest">Precio Venta</th>
-                  <th className="p-6 text-[10px] font-black uppercase text-gray-400 tracking-widest">Estado</th>
-                  <th className="p-6 text-[10px] font-black uppercase text-gray-400 tracking-widest">Inversión</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100">
-                {productos.map(p => (
-                  <tr key={p.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="p-6">
-                      <p className="font-black text-gray-800 uppercase text-xs italic">{p.nombre}</p>
-                      <p className="text-[9px] text-gray-400 font-bold uppercase">{p.categoria}</p>
-                    </td>
-                    <td className="p-6 font-black text-sm">{p.stock}</td>
-                    <td className="p-6 font-bold text-gray-500 text-sm">${p.precio_venta.toLocaleString()}</td>
-                    <td className="p-6">
-                       <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase border ${p.stock <= p.stock_minimo ? 'bg-red-50 text-red-600 border-red-100' : 'bg-green-50 text-green-600 border-green-100'}`}>
-                         {p.stock <= p.stock_minimo ? 'Comprar' : 'Ok'}
-                       </span>
-                    </td>
-                    <td className="p-6 font-black text-gray-900 text-sm">${(p.precio_venta * p.stock).toLocaleString()}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+        {/* VISTA PREVIA DE DATOS */}
+        <main className="bg-white border border-slate-200 rounded-[3rem] shadow-2xl shadow-slate-200/50 overflow-hidden">
+            <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse min-w-[800px]">
+                    <thead>
+                        <tr className="bg-slate-50 border-b border-slate-100">
+                            {activeTab === 'ventas' && (
+                                <>
+                                    <th className="p-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Fecha/Placa</th>
+                                    <th className="p-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Servicios Realizados</th>
+                                    <th className="p-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Operador</th>
+                                    <th className="p-6 text-[10px] font-black uppercase text-slate-400 tracking-widest text-right">Total</th>
+                                </>
+                            )}
+                            {activeTab === 'inventario' && (
+                                <>
+                                    <th className="p-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Producto</th>
+                                    <th className="p-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Stock</th>
+                                    <th className="p-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Categoría</th>
+                                    <th className="p-6 text-[10px] font-black uppercase text-slate-400 tracking-widest text-right">Precio Venta</th>
+                                </>
+                            )}
+                            {activeTab === 'parqueadero' && (
+                                <>
+                                    <th className="p-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Salida/Placa</th>
+                                    <th className="p-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Tipo Tarifa</th>
+                                    <th className="p-6 text-[10px] font-black uppercase text-slate-400 tracking-widest">Pago</th>
+                                    <th className="p-6 text-[10px] font-black uppercase text-slate-400 tracking-widest text-right">Total</th>
+                                </>
+                            )}
+                        </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-50">
+                        {loading ? (
+                            <tr><td colSpan={4} className="p-20 text-center text-slate-300 font-black italic animate-pulse">Cargando base de datos...</td></tr>
+                        ) : dataFiltrada.length === 0 ? (
+                            <tr><td colSpan={4} className="p-20 text-center text-slate-300 font-bold uppercase italic">No se encontraron resultados</td></tr>
+                        ) : (
+                            dataFiltrada.map((item) => (
+                                <motion.tr 
+                                    initial={{opacity:0}} animate={{opacity:1}}
+                                    key={item.id} className="hover:bg-slate-50 transition-colors group"
+                                >
+                                    {activeTab === 'ventas' && (
+                                        <>
+                                            <td className="p-6">
+                                                <p className="font-black text-slate-900 text-lg tracking-tighter leading-none">{item.placa}</p>
+                                                <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">{new Date(item.creado_en).toLocaleString()}</p>
+                                            </td>
+                                            <td className="p-6 text-xs font-bold text-slate-500 uppercase italic">{item.nombres_servicios}</td>
+                                            <td className="p-6 text-xs font-black text-slate-900">{item.perfiles?.nombre || 'General'}</td>
+                                            <td className="p-6 text-right font-black text-slate-900 text-lg">${Number(item.total).toLocaleString()}</td>
+                                        </>
+                                    )}
+                                    {activeTab === 'inventario' && (
+                                        <>
+                                            <td className="p-6">
+                                                <p className="font-black text-slate-900 text-lg tracking-tighter leading-none">{item.nombre}</p>
+                                                <p className={`text-[10px] font-bold uppercase mt-1 ${item.stock <= item.stock_minimo ? 'text-red-500' : 'text-slate-400'}`}>Stock Mín: {item.stock_minimo}</p>
+                                            </td>
+                                            <td className="p-6">
+                                                <span className={`px-4 py-1.5 rounded-full font-black text-xs ${item.stock <= item.stock_minimo ? 'bg-red-50 text-red-600 border border-red-100' : 'bg-green-50 text-green-600 border border-green-100'}`}>
+                                                    {item.stock} UNIDADES
+                                                </span>
+                                            </td>
+                                            <td className="p-6 text-xs font-black text-slate-400 uppercase">{item.categoria}</td>
+                                            <td className="p-6 text-right font-black text-slate-900 text-lg">${Number(item.precio_venta).toLocaleString()}</td>
+                                        </>
+                                    )}
+                                    {activeTab === 'parqueadero' && (
+                                        <>
+                                            <td className="p-6">
+                                                <p className="font-black text-slate-900 text-lg tracking-tighter leading-none">{item.placa}</p>
+                                                <p className="text-[10px] text-slate-400 font-bold uppercase mt-1">{new Date(item.hora_salida).toLocaleString()}</p>
+                                            </td>
+                                            <td className="p-6 text-xs font-black text-slate-400 uppercase italic">{item.tipo_tarifa || 'HORA'}</td>
+                                            <td className="p-6">
+                                                <span className={`px-3 py-1 rounded-full text-[10px] font-black uppercase ${item.metodo_pago === 'efectivo' ? 'bg-green-50 text-green-600' : 'bg-blue-50 text-blue-600'}`}>
+                                                    {item.metodo_pago}
+                                                </span>
+                                            </td>
+                                            <td className="p-6 text-right font-black text-slate-900 text-lg">${Number(item.total_pagar).toLocaleString()}</td>
+                                        </>
+                                    )}
+                                </motion.tr>
+                            ))
+                        )}
+                    </tbody>
+                </table>
+            </div>
+        </main>
+
+        {/* SNAPSHOT RESUMEN INFERIOR */}
+        <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6 print:hidden">
+            <div className="bg-white p-6 rounded-[2rem] border border-slate-200 shadow-lg flex items-center justify-between">
+                <div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase">Recuento de Filas</p>
+                    <p className="text-3xl font-black text-slate-900">{dataFiltrada.length}</p>
+                </div>
+                <div className="p-4 bg-slate-50 rounded-2xl text-slate-400"><History size={24}/></div>
+            </div>
         </div>
 
       </div>
     </div>
+  )
+}
+
+function ReportTab({ label, icon, active, onClick }: any) {
+  return (
+    <button 
+      onClick={onClick}
+      className={`flex-1 flex items-center justify-center gap-3 px-6 py-4 rounded-[1.5rem] font-black text-[11px] uppercase tracking-widest transition-all duration-300 ${
+        active 
+        ? 'bg-gorilla-purple text-white shadow-xl shadow-purple-200 translate-y-[-2px]' 
+        : 'text-slate-400 hover:text-slate-600'
+      }`}
+    >
+      {icon} {label}
+    </button>
   )
 }
