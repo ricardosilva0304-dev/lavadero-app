@@ -12,21 +12,21 @@ export default function LayoutWrapper({ children }: { children: React.ReactNode 
     if (userData) {
       setRol(JSON.parse(userData).rol)
     }
-  }, [pathname]) // Se actualiza cada vez que cambia la ruta
+  }, [pathname])
 
   const isLoginPage = pathname === '/login' || pathname === '/'
-  
-  // CONDICIÓN CLAVE: Si es empleado, NO mostramos sidebar ni margen
   const isEmpleado = rol === 'empleado'
 
   if (isLoginPage || isEmpleado) {
-    return <main className="w-full min-h-screen">{children}</main>
+    // Añadimos h-full para que el scroll funcione bien
+    return <main className="w-full min-h-screen overflow-y-auto">{children}</main>
   }
 
   return (
-    <div className="flex min-h-screen">
+    <div className="flex min-h-screen bg-gray-50">
       <Sidebar />
-      <main className="flex-1 w-full lg:ml-72 transition-all duration-300">
+      {/* Añadimos h-screen y overflow-y-auto para que la parte derecha sea independiente */}
+      <main className="flex-1 w-full lg:ml-72 h-screen overflow-y-auto transition-all duration-300">
         {children}
       </main>
     </div>
