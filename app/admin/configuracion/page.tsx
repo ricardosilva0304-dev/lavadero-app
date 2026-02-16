@@ -1,10 +1,10 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
-import { 
-  Settings, Users, Car, Bike, Trash2, Plus, 
-  ShieldCheck, Smartphone, DollarSign, Briefcase, 
-  UserPlus, Layers, Save, X, Edit3, Clock, Check, Info 
+import {
+  Settings, Users, Car, Bike, Trash2, Plus,
+  ShieldCheck, Smartphone, DollarSign, Briefcase,
+  UserPlus, Layers, Save, X, Edit3, Clock, Check, Info
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -80,14 +80,20 @@ export default function ConfiguracionPage() {
     fetchData()
   }
 
-  const actualizarTarifa = async (tipo: 'carro' | 'moto', valor: number) => {
+  const actualizarTarifa = async (tipo: 'carro' | 'moto', precios: any) => {
     const { error } = await supabase
       .from('config_parqueadero')
-      .update({ precio_hora: valor, actualizado_en: new Date().toISOString() })
+      .update({
+        precio_hora: precios.hora,
+        precio_noche: precios.noche,
+        precio_dia: precios.dia,
+        precio_mes: precios.mes,
+        actualizado_en: new Date().toISOString()
+      })
       .eq('tipo_vehiculo', tipo)
 
     if (!error) {
-      setTarifas(prev => ({ ...prev, [tipo]: valor }))
+      fetchData(); // Recargar datos
     }
   }
 
@@ -291,38 +297,59 @@ function FormInput({ label, dark, icon, ...props }: any) {
   )
 }
 
-function TarifaCard({ tipo, icono, valor, onSave }: any) {
-  const [val, setVal] = useState(valor)
+// Reemplaza el componente TarifaCard y MiniInput por estos:
+
+function TarifaCard({ tipo, icono, valores, onSave }: any) {
+  const [vals, setVals] = useState({ hora: 0, noche: 0, dia: 0, mes: 0 })
   const [saved, setSaved] = useState(false)
 
-  useEffect(() => setVal(valor), [valor])
+  useEffect(() => {
+    setVals({
+      hora: valores.precio_hora || 0,
+      noche: valores.precio_noche || 0,
+      dia: valores.precio_dia || 0,
+      mes: valores.precio_mes || 0
+    })
+  }, [valores])
 
   return (
-    <div className="flex-1 bg-white border-2 border-slate-100 p-10 rounded-[3.5rem] shadow-xl hover:shadow-2xl transition-all group">
-      <div className="flex justify-between items-start mb-10">
-        <div className="p-6 bg-slate-900 text-white rounded-[2rem] shadow-lg group-hover:scale-110 transition-transform">
-          {icono}
-        </div>
-        <div className="text-right">
-          <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Tarifa Hora</p>
-          <h3 className="text-2xl font-black italic uppercase text-slate-900 tracking-tighter">{tipo}</h3>
-        </div>
+    <div className="flex-1 bg-white border-2 border-slate-100 p-8 rounded-[3.5rem] shadow-xl group">
+      <div className="flex justify-between items-center mb-8">
+        <div className="p-4 bg-slate-900 text-white rounded-2xl shadow-lg">{icono}</div>
+        <h3 className="text-2xl font-black italic uppercase text-slate-900 tracking-tighter">{tipo}</h3>
       </div>
-      <div className="relative mb-6">
-        <DollarSign className="absolute left-4 top-5 text-gorilla-orange" size={24} />
+
+      <div className="grid grid-cols-2 gap-4">
+        {/* CORRECCIÓN: Se añadió (v: any) en cada onChange */}
+        <MiniInput label="Hora" value={vals.hora} onChange={(v: any) => setVals({ ...vals, hora: v })} />
+        <MiniInput label="Noche" value={vals.noche} onChange={(v: any) => setVals({ ...vals, noche: v })} />
+        <MiniInput label="Día" value={vals.dia} onChange={(v: any) => setVals({ ...vals, dia: v })} />
+        <MiniInput label="Mes" value={vals.mes} onChange={(v: any) => setVals({ ...vals, mes: v })} />
+      </div>
+
+      <button
+        onClick={() => { onSave(tipo, vals); setSaved(true); setTimeout(() => setSaved(false), 2000) }}
+        className={`w-full mt-6 p-4 rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 transition-all ${saved ? 'bg-green-500 text-white' : 'bg-slate-900 text-white hover:bg-black shadow-lg'}`}
+      >
+        {saved ? <><Check size={16} /> Tarifas Guardadas</> : <><Save size={16} /> Actualizar Precios</>}
+      </button>
+    </div>
+  )
+}
+
+function MiniInput({ label, value, onChange }: any) {
+  return (
+    <div className="space-y-1">
+      <label className="text-[9px] font-black text-slate-400 uppercase ml-2 tracking-widest">{label}</label>
+      <div className="relative">
+        <DollarSign className="absolute left-2 top-3 text-gorilla-orange" size={12} />
         <input
           type="number"
-          value={val}
-          onChange={(e: any) => { setVal(Number(e.target.value)); setSaved(false) }}
-          className="w-full bg-slate-50 border-none p-6 pl-12 rounded-3xl text-3xl font-black text-slate-900 outline-none focus:ring-4 focus:ring-orange-500/10 transition-all"
+          value={value}
+          onChange={(e: any) => onChange(Number(e.target.value))}
+          className="w-full bg-slate-50 border-none p-3 pl-6 rounded-xl text-sm font-black outline-none focus:ring-2 focus:ring-orange-500/20 text-slate-900"
         />
       </div>
-      <button
-        onClick={() => { onSave(val); setSaved(true); setTimeout(() => setSaved(false), 2000) }}
-        className={`w-full p-5 rounded-2xl font-black uppercase text-xs tracking-widest flex items-center justify-center gap-2 transition-all ${saved ? 'bg-green-500 text-white shadow-green-200' : 'bg-slate-900 text-white hover:bg-black shadow-lg'}`}
-      >
-        {saved ? <><Check size={18} /> Actualizado</> : <><Save size={18} /> Guardar Tarifa</>}
-      </button>
     </div>
   )
 }

@@ -1,268 +1,275 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
-import {
-  Car, Bike, Clock, User, Phone, LogOut,
-  Search, Zap, ArrowRightCircle, Timer, Shield, CheckCircle
+import { 
+  Car, Bike, Clock, User, Phone, LogOut, Search, Zap, 
+  ArrowRightCircle, Timer, Shield, DollarSign, CreditCard, X, CheckCircle2,
+  Calendar, Hash, ArrowRight
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+
+export const dynamic = 'force-dynamic'
 
 export default function ParqueaderoPage() {
   const supabase = createClient()
   const [registros, setRegistros] = useState<any[]>([])
-  const [precios, setPrecios] = useState<any>({})
+  const [configPrecios, setConfigPrecios] = useState<any[]>([])
   const [now, setNow] = useState(new Date())
+  
+  const [vehiculoSalida, setVehiculoSalida] = useState<any>(null)
+  const [pagoSeleccionado, setPagoSeleccionado] = useState<'efectivo' | 'transferencia'>('efectivo')
+  const [tarifaSeleccionada, setTarifaSeleccionada] = useState<'hora' | 'noche' | 'dia' | 'mes'>('hora')
 
   const [form, setForm] = useState({ nombre: '', celular: '', placa: '', tipo: 'carro' })
-  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     fetchRegistros()
     fetchPrecios()
     const timer = setInterval(() => setNow(new Date()), 60000)
-    const channel = supabase.channel('parqueadero_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'parqueadero_registros' }, () => fetchRegistros())
-      .subscribe()
-    return () => { clearInterval(timer); supabase.removeChannel(channel) }
+    return () => clearInterval(timer)
   }, [])
 
   const fetchPrecios = async () => {
     const { data } = await supabase.from('config_parqueadero').select('*')
-    const preciosMap = data?.reduce((acc: any, curr: any) => {
-      acc[curr.tipo_vehiculo] = curr.precio_hora
-      return acc
-    }, {})
-    setPrecios(preciosMap || { carro: 5000, moto: 2000 })
+    setConfigPrecios(data || [])
   }
 
   const fetchRegistros = async () => {
-    const { data } = await supabase.from('parqueadero_registros')
-      .select('*')
-      .eq('estado', 'activo')
-      .order('hora_entrada', { ascending: false })
+    const { data } = await supabase.from('parqueadero_registros').select('*').eq('estado', 'activo').order('hora_entrada', { ascending: false })
     setRegistros(data || [])
   }
 
-  const handleIngreso = async (e: React.FormEvent) => {
+  const handleIngreso = async (e: any) => {
     e.preventDefault()
     if (!form.placa) return
-    setLoading(true)
     await supabase.from('parqueadero_registros').insert([{
-      nombre_cliente: form.nombre,
-      celular: form.celular,
-      placa: form.placa.toUpperCase(),
-      tipo_vehiculo: form.tipo
+      nombre_cliente: form.nombre, celular: form.celular,
+      placa: form.placa.toUpperCase(), tipo_vehiculo: form.tipo
     }])
     setForm({ nombre: '', celular: '', placa: '', tipo: 'carro' })
-    setLoading(false)
+    fetchRegistros()
   }
 
-  const calcularCobro = (entrada: string, tipo: string) => {
-    const inicio = new Date(entrada).getTime()
-    const fin = now.getTime()
-    const minutos = Math.floor((fin - inicio) / (1000 * 60))
-    const horas = Math.max(1, Math.ceil(minutos / 60))
-    const tarifa = precios[tipo] || 0
-    return { horas, total: horas * tarifa, minutos }
+  const obtenerPrecio = (tipoVehiculo: string, tipoCobro: string) => {
+    const precios = configPrecios.find(p => p.tipo_vehiculo === tipoVehiculo)
+    if (!precios) return 0
+    switch(tipoCobro) {
+      case 'noche': return precios.precio_noche
+      case 'dia': return precios.precio_dia
+      case 'mes': return precios.precio_mes
+      default:
+        const entrada = new Date(vehiculoSalida?.hora_entrada || now).getTime()
+        const minutos = Math.floor((now.getTime() - entrada) / (1000 * 60))
+        const horas = Math.max(1, Math.ceil(minutos / 60))
+        return horas * precios.precio_hora
+    }
   }
 
-  const finalizarServicio = async (id: string, total: number) => {
-    if (confirm(`¿Confirmar salida y cobro de $${total.toLocaleString()}?`)) {
-      const { error } = await supabase.from('parqueadero_registros')
-        .update({
-          estado: 'finalizado',
-          hora_salida: new Date().toISOString(),
-          total_pagar: Number(total), // Convertir a número por seguridad
-          metodo_pago: 'efectivo'     // Esta es la columna que suele faltar
-        })
-        .eq('id', id);
+  const confirmarSalida = async () => {
+    const total = obtenerPrecio(vehiculoSalida.tipo_vehiculo, tarifaSeleccionada)
+    const { error } = await supabase.from('parqueadero_registros').update({
+      estado: 'finalizado',
+      hora_salida: new Date().toISOString(),
+      total_pagar: total,
+      metodo_pago: pagoSeleccionado,
+      tipo_tarifa: tarifaSeleccionada
+    }).eq('id', vehiculoSalida.id)
 
-      if (error) {
-        console.error("Error al finalizar:", error);
-        alert("Hubo un error al procesar la salida.");
-      } else {
-        fetchRegistros(); // Refrescar la lista
-      }
+    if (!error) {
+      setVehiculoSalida(null)
+      fetchRegistros()
     }
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 text-gray-900 p-4 md:p-10 relative overflow-hidden">
-
-      {/* Fondo decorativo sutil */}
-      <div className="absolute top-0 left-1/4 w-96 h-96 bg-gorilla-orange/5 rounded-full blur-[100px] -z-10" />
-
-      <div className="max-w-7xl mx-auto">
-
+    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 p-4 md:p-10 pb-20 relative overflow-y-auto">
+      
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="max-w-7xl mx-auto">
+        
         {/* HEADER */}
-        <header className="flex flex-col md:flex-row md:items-center justify-between mb-12 gap-6">
-          <motion.div
-            initial={{ opacity: 0, x: -30 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="flex items-center gap-4"
-          >
-            <div className="p-4 bg-white rounded-[2rem] border border-gray-200 shadow-xl shadow-gray-200/50 text-gorilla-orange">
-              <Timer className="w-10 h-10" />
+        <header className="mb-12">
+            <div className="flex items-center gap-3 mb-2">
+                <div className="h-1 w-12 bg-gorilla-orange rounded-full" />
+                <span className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-400">Logística de Estancia</span>
             </div>
-            <div>
-              <h1 className="text-4xl font-black italic tracking-tighter uppercase text-gray-900">Control <span className="text-gorilla-orange">Estancia</span></h1>
-              <div className="flex items-center gap-2 text-gray-400 text-xs font-bold tracking-widest uppercase">
-                <Shield size={12} className="text-green-600" /> Tiempo Real Activo
-              </div>
-            </div>
-          </motion.div>
-
-          <div className="flex gap-4">
-            <div className="bg-white px-8 py-4 rounded-2xl border border-gray-200 shadow-md text-center">
-              <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">En Patio</p>
-              <p className="text-3xl font-black text-gray-900">{registros.length}</p>
-            </div>
-          </div>
+            <h1 className="text-5xl font-black tracking-tighter uppercase italic text-slate-900">
+                Gestión <span className="text-gorilla-orange underline decoration-slate-200 underline-offset-8">Parqueo</span>
+            </h1>
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-
-          {/* PANEL DE REGISTRO (STICKY) */}
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="lg:col-span-4"
-          >
-            <form onSubmit={handleIngreso} className="bg-white p-8 rounded-[2.5rem] border border-gray-200 shadow-xl shadow-gray-200/50 sticky top-10">
-              <h2 className="text-xl font-black mb-8 flex items-center gap-3 text-gray-800 uppercase italic">
-                <Zap className="text-gorilla-purple" size={24} />
-                Entrada Rápida
+          
+          {/* PANEL DE INGRESO */}
+          <div className="lg:col-span-4">
+            <div className="bg-white rounded-[3rem] p-8 shadow-2xl shadow-slate-200 border border-white sticky top-10">
+              <h2 className="text-xs font-black text-slate-400 uppercase tracking-[0.3em] mb-8 flex items-center gap-3">
+                <Zap size={16} className="text-gorilla-purple fill-gorilla-purple" /> 1. Registro de Entrada
               </h2>
-
-              <div className="space-y-6">
-                {/* Selector Carro/Moto */}
-                <div className="flex bg-gray-100 rounded-2xl p-1.5 gap-2">
-                  <button type="button" onClick={() => setForm({ ...form, tipo: 'carro' })}
-                    className={`flex-1 py-4 rounded-xl font-black flex items-center justify-center gap-2 transition-all ${form.tipo === 'carro' ? 'bg-white text-gorilla-orange shadow-md' : 'text-gray-400 hover:text-gray-600'}`}>
-                    <Car size={20} /> CARRO
+              
+              <form onSubmit={handleIngreso} className="space-y-6">
+                <div className="flex bg-slate-50 rounded-[2rem] p-2 border-2 border-slate-100 gap-2">
+                  <button type="button" onClick={() => setForm({...form, tipo: 'carro'})}
+                    className={`flex-1 py-4 rounded-[1.5rem] font-black flex items-center justify-center gap-2 transition-all ${form.tipo === 'carro' ? 'bg-white text-blue-600 shadow-lg border border-blue-50' : 'text-slate-400 hover:text-slate-600'}`}>
+                    <Car size={20}/> CARRO
                   </button>
-                  <button type="button" onClick={() => setForm({ ...form, tipo: 'moto' })}
-                    className={`flex-1 py-4 rounded-xl font-black flex items-center justify-center gap-2 transition-all ${form.tipo === 'moto' ? 'bg-white text-gorilla-orange shadow-md' : 'text-gray-400 hover:text-gray-600'}`}>
-                    <Bike size={20} /> MOTO
+                  <button type="button" onClick={() => setForm({...form, tipo: 'moto'})}
+                    className={`flex-1 py-4 rounded-[1.5rem] font-black flex items-center justify-center gap-2 transition-all ${form.tipo === 'moto' ? 'bg-white text-gorilla-orange shadow-lg border border-orange-50' : 'text-slate-400 hover:text-slate-600'}`}>
+                    <Bike size={20}/> MOTO
                   </button>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold text-gray-400 ml-2 uppercase tracking-widest">Placa del Vehículo</label>
-                  <div className="relative group">
-                    <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 group-focus-within:text-gorilla-orange transition-colors" />
-                    <input placeholder="AAA-000" required className="w-full bg-gray-50 border border-gray-200 p-5 pl-12 rounded-2xl text-3xl font-black uppercase tracking-widest focus:bg-white focus:ring-2 focus:ring-gorilla-orange outline-none transition-all text-gray-900 placeholder:text-gray-300"
-                      value={form.placa} onChange={e => setForm({ ...form, placa: e.target.value })} />
-                  </div>
+                <div className="bg-slate-900 rounded-[2rem] p-6 border-4 border-slate-800 shadow-inner">
+                    <input 
+                        placeholder="ABC 123" 
+                        required 
+                        className="w-full bg-transparent border-none text-5xl font-black text-center uppercase tracking-tighter text-gorilla-orange outline-none placeholder:text-slate-800" 
+                        value={form.placa} 
+                        onChange={e => setForm({...form, placa: e.target.value})} 
+                    />
                 </div>
 
-                <div className="grid grid-cols-1 gap-4">
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-400 ml-2 uppercase">Cliente</label>
-                    <input placeholder="Nombre (Opcional)" className="w-full bg-gray-50 border border-gray-200 p-4 rounded-2xl outline-none focus:bg-white focus:border-gorilla-purple transition-all text-gray-900"
-                      value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })} />
-                  </div>
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-bold text-gray-400 ml-2 uppercase">Celular</label>
-                    <input placeholder="300..." className="w-full bg-gray-50 border border-gray-200 p-4 rounded-2xl outline-none focus:bg-white focus:border-gorilla-purple transition-all text-gray-900"
-                      value={form.celular} onChange={e => setForm({ ...form, celular: e.target.value })} />
-                  </div>
+                <div className="space-y-4">
+                    <div className="relative">
+                        <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                        <input placeholder="Nombre Cliente (Opcional)" className="w-full bg-slate-50 border border-slate-100 p-4 pl-12 rounded-2xl outline-none focus:bg-white focus:border-gorilla-purple transition-all font-bold"
+                            value={form.nombre} onChange={e => setForm({...form, nombre: e.target.value})} />
+                    </div>
+                    <div className="relative">
+                        <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                        <input placeholder="Celular" className="w-full bg-slate-50 border border-slate-100 p-4 pl-12 rounded-2xl outline-none focus:bg-white focus:border-gorilla-purple transition-all font-bold"
+                            value={form.celular} onChange={e => setForm({...form, celular: e.target.value})} />
+                    </div>
                 </div>
 
-                <button
-                  disabled={loading}
-                  className="w-full bg-gorilla-purple hover:bg-violet-700 text-white font-black py-5 rounded-[1.5rem] shadow-xl shadow-purple-200 transition-all active:scale-95 flex items-center justify-center gap-3"
-                >
-                  <ArrowRightCircle size={24} />
-                  {loading ? '...' : 'REGISTRAR'}
+                <button className="w-full bg-slate-900 hover:bg-black text-white font-black py-6 rounded-[2rem] shadow-xl transition-all active:scale-95 flex items-center justify-center gap-3 italic uppercase tracking-widest">
+                  Registrar Ingreso <ArrowRightCircle size={24} />
                 </button>
-              </div>
-            </form>
-          </motion.div>
-
-          {/* LISTA: VEHÍCULOS ACTIVOS */}
-          <div className="lg:col-span-8 space-y-6">
-            <h2 className="text-xl font-black flex items-center gap-3 text-gray-800 px-2 uppercase italic">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-              Vehículos Adentro
-            </h2>
-
-            <AnimatePresence mode='popLayout'>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {registros.map((reg) => {
-                  const { horas, total, minutos } = calcularCobro(reg.hora_entrada, reg.tipo_vehiculo)
-                  return (
-                    <motion.div
-                      layout
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.8 }}
-                      key={reg.id}
-                      className="bg-white border border-gray-100 p-6 rounded-[2.5rem] shadow-xl shadow-gray-200/40 hover:border-gorilla-orange/50 transition-all group relative overflow-hidden"
-                    >
-                      <div className="flex justify-between items-start mb-6">
-                        <div className={`p-4 rounded-2xl ${reg.tipo_vehiculo === 'carro' ? 'bg-blue-50 text-blue-600' : 'bg-orange-50 text-orange-600'}`}>
-                          {reg.tipo_vehiculo === 'carro' ? <Car size={28} /> : <Bike size={28} />}
-                        </div>
-                        <div className="text-right">
-                          <span className="text-4xl font-black tracking-tighter text-gray-900 block">{reg.placa}</span>
-                          <span className="text-[10px] text-gray-400 font-bold bg-gray-50 px-2 py-1 rounded-md uppercase">Entrada: {new Date(reg.hora_entrada).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
-                        </div>
-                      </div>
-
-                      <div className="space-y-3 mb-8 bg-gray-50 p-4 rounded-2xl border border-gray-100">
-                        <div className="flex items-center gap-3 text-sm font-medium">
-                          <User size={16} className="text-gorilla-purple" />
-                          <span className="text-gray-600 uppercase text-xs font-bold">{reg.nombre_cliente || 'Cliente General'}</span>
-                        </div>
-                        {reg.celular && (
-                          <div className="flex items-center gap-3 text-sm font-medium">
-                            <Phone size={16} className="text-gorilla-purple" />
-                            <span className="text-gray-500 text-xs">{reg.celular}</span>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="flex items-center justify-between gap-4 border-t border-gray-100 pt-4">
-                        <div>
-                          <p className="text-[10px] text-gray-400 uppercase font-black tracking-widest mb-1">Tiempo</p>
-                          <div className="flex items-baseline gap-1">
-                            <span className="text-3xl font-black text-gray-900">{minutos}</span>
-                            <span className="text-[10px] font-bold text-gray-400">MIN</span>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-[10px] text-gray-400 uppercase font-black tracking-widest mb-1">A Pagar</p>
-                          <p className="text-3xl font-black text-green-600">${total.toLocaleString()}</p>
-                        </div>
-                      </div>
-
-                      <button
-                        onClick={() => finalizarServicio(reg.id, total)}
-                        className="w-full mt-6 bg-red-50 hover:bg-red-500 text-red-500 hover:text-white py-4 rounded-2xl font-black transition-all flex items-center justify-center gap-2 border border-red-100 group"
-                      >
-                        COBRAR Y SALIDA <LogOut size={18} className="group-hover:translate-x-1 transition-transform" />
-                      </button>
-                    </motion.div>
-                  )
-                })}
-              </div>
-            </AnimatePresence>
-
-            {registros.length === 0 && (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="text-center py-32 bg-white rounded-[2rem] border border-dashed border-gray-200"
-              >
-                <Clock className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-400 font-bold uppercase tracking-widest">Patio Vacío</p>
-              </motion.div>
-            )}
+              </form>
+            </div>
           </div>
 
+          {/* LISTADO DE VEHICULOS ACTIVOS */}
+          <div className="lg:col-span-8 space-y-6">
+            <div className="flex items-center justify-between px-4">
+                <h2 className="text-xl font-black italic uppercase text-slate-800 flex items-center gap-3">
+                    <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.5)]" />
+                    Vehículos en Patio
+                </h2>
+                <span className="bg-slate-900 text-white text-[10px] font-black px-4 py-1.5 rounded-full uppercase tracking-widest">{registros.length} Activos</span>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {registros.map((reg) => (
+                <motion.div 
+                    layout
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    key={reg.id} 
+                    className="bg-white border border-slate-100 p-8 rounded-[3rem] shadow-xl shadow-slate-200/60 hover:border-gorilla-orange/40 transition-all group relative overflow-hidden"
+                >
+                  <div className="flex justify-between items-start mb-8 relative z-10">
+                    <div className={`p-4 rounded-2xl shadow-lg ${reg.tipo_vehiculo === 'carro' ? 'bg-blue-600 text-white' : 'bg-gorilla-orange text-white'}`}>
+                      {reg.tipo_vehiculo === 'carro' ? <Car size={28}/> : <Bike size={28}/>}
+                    </div>
+                    <div className="text-right">
+                      <span className="text-5xl font-black text-slate-900 block tracking-tighter leading-none">{reg.placa}</span>
+                      <span className="text-[10px] text-slate-400 font-black uppercase tracking-widest mt-2 block italic">{new Date(reg.hora_entrada).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})}</span>
+                    </div>
+                  </div>
+
+                  <div className="bg-slate-50 p-5 rounded-[1.5rem] border border-slate-100 mb-8 space-y-2">
+                     <div className="flex items-center gap-3 text-xs font-bold text-slate-600">
+                        <User size={14} className="text-gorilla-purple" /> {reg.nombre_cliente || 'CLIENTE GENERAL'}
+                     </div>
+                     {reg.celular && (
+                         <div className="flex items-center gap-3 text-xs font-bold text-slate-400">
+                            <Phone size={14} className="text-gorilla-purple" /> {reg.celular}
+                         </div>
+                     )}
+                  </div>
+
+                  <button 
+                    onClick={() => setVehiculoSalida(reg)}
+                    className="w-full bg-red-50 hover:bg-red-500 text-red-500 hover:text-white py-5 rounded-[1.5rem] font-black transition-all border-2 border-red-100 hover:border-red-500 flex items-center justify-center gap-3 uppercase italic text-xs tracking-[0.2em]"
+                  >
+                    Marcar Salida <LogOut size={18} />
+                  </button>
+                </motion.div>
+              ))}
+            </div>
+
+            {registros.length === 0 && (
+                <div className="text-center py-40 bg-white rounded-[4rem] border-4 border-dashed border-slate-100 flex flex-col items-center">
+                    <Clock size={64} className="text-slate-100 mb-4" />
+                    <p className="text-slate-300 font-black uppercase tracking-[0.3em]">Patio Vacío</p>
+                </div>
+            )}
+          </div>
         </div>
-      </div>
+      </motion.div>
+
+      {/* MODAL DE COBRO (LIQUIDACIÓN) */}
+      <AnimatePresence>
+        {vehiculoSalida && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/40 backdrop-blur-md">
+            <motion.div initial={{scale:0.9, opacity:0}} animate={{scale:1, opacity:1}} exit={{scale:0.9, opacity:0}} className="bg-white rounded-[4rem] p-10 max-w-lg w-full shadow-[0_50px_100px_rgba(0,0,0,0.3)] border border-white">
+              
+              <div className="flex justify-between items-center mb-10">
+                <h2 className="text-3xl font-black italic uppercase text-slate-900 tracking-tighter">Liquidación <span className="text-gorilla-orange">Caja</span></h2>
+                <button onClick={() => setVehiculoSalida(null)} className="p-3 bg-slate-100 rounded-full text-slate-400 hover:bg-slate-200 transition-colors"><X size={24}/></button>
+              </div>
+
+              <div className="bg-slate-900 rounded-[2.5rem] p-8 text-white mb-10 flex justify-between items-center shadow-2xl relative overflow-hidden">
+                 <div className="absolute top-0 left-0 w-2 h-full bg-gorilla-orange" />
+                 <div>
+                    <p className="text-[10px] text-slate-500 font-black uppercase tracking-widest mb-1">Matrícula</p>
+                    <p className="text-5xl font-black tracking-tighter text-white">{vehiculoSalida.placa}</p>
+                 </div>
+                 <div className="text-right">
+                    <p className="text-[10px] text-slate-500 font-black uppercase mb-1">Total Neto</p>
+                    <p className="text-5xl font-black text-gorilla-orange tracking-tighter">
+                        ${obtenerPrecio(vehiculoSalida.tipo_vehiculo, tarifaSeleccionada).toLocaleString()}
+                    </p>
+                 </div>
+              </div>
+
+              {/* TARIFA */}
+              <div className="space-y-4 mb-10">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 flex items-center gap-2">
+                    <Calendar size={12}/> Elegir Tipo de Tarifa
+                </p>
+                <div className="grid grid-cols-2 gap-3">
+                   {['hora', 'noche', 'dia', 'mes'].map(t => (
+                     <button key={t} onClick={() => setTarifaSeleccionada(t as any)} 
+                        className={`py-4 rounded-2xl font-black uppercase text-[10px] border-2 transition-all tracking-widest ${tarifaSeleccionada === t ? 'border-gorilla-orange bg-orange-50 text-gorilla-orange shadow-lg shadow-orange-100' : 'border-slate-50 bg-slate-50 text-slate-400 hover:border-slate-200'}`}>
+                        {t}
+                     </button>
+                   ))}
+                </div>
+              </div>
+
+              {/* PAGO */}
+              <div className="space-y-4 mb-12">
+                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-4 flex items-center gap-2">
+                    <DollarSign size={12}/> Método de Recaudo
+                </p>
+                <div className="flex gap-4">
+                   <button onClick={() => setPagoSeleccionado('efectivo')} className={`flex-1 py-6 rounded-3xl border-2 flex flex-col items-center gap-3 transition-all ${pagoSeleccionado === 'efectivo' ? 'border-green-500 bg-green-50 text-green-600 shadow-xl shadow-green-100' : 'border-slate-50 bg-slate-50 text-slate-400'}`}>
+                      <DollarSign size={28}/> <span className="font-black text-xs italic">EFECTIVO</span>
+                   </button>
+                   <button onClick={() => setPagoSeleccionado('transferencia')} className={`flex-1 py-6 rounded-3xl border-2 flex flex-col items-center gap-3 transition-all ${pagoSeleccionado === 'transferencia' ? 'border-blue-500 bg-blue-50 text-blue-600 shadow-xl shadow-blue-100' : 'border-slate-50 bg-slate-50 text-slate-400'}`}>
+                      <CreditCard size={28}/> <span className="font-black text-xs italic">TRANSFERENCIA</span>
+                   </button>
+                </div>
+              </div>
+
+              <button onClick={confirmarSalida} className="w-full bg-slate-900 hover:bg-black text-white p-7 rounded-[2rem] font-black uppercase italic tracking-[0.2em] shadow-2xl flex items-center justify-center gap-4 transition-all active:scale-95">
+                Cerrar Operación <CheckCircle2 size={28}/>
+              </button>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }
