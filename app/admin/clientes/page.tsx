@@ -6,6 +6,7 @@ import {
   History, Smartphone, CreditCard, ChevronRight, X, Filter, Plus 
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+export const dynamic = 'force-dynamic'
 
 export default function BaseClientesPage() {
   const supabase = createClient()

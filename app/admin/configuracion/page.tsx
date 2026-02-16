@@ -6,6 +6,7 @@ import {
   ShieldCheck, Smartphone, DollarSign, Briefcase, ChevronRight 
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+export const dynamic = 'force-dynamic'
 
 export default function ConfiguracionPage() {
   const supabase = createClient()

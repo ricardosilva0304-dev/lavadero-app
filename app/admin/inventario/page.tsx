@@ -7,6 +7,7 @@ import {
   ChevronRight, ArrowRight, Zap, Coffee
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+export const dynamic = 'force-dynamic'
 
 export default function InventarioPage() {
   const supabase = createClient()

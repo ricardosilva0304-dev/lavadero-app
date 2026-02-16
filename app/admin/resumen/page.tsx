@@ -7,6 +7,7 @@ import {
   ArrowUpRight, Target, Activity, Zap
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+export const dynamic = 'force-dynamic'
 
 export default function ResumenPage() {
   const supabase = createClient()

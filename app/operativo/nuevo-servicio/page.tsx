@@ -7,6 +7,7 @@ import {
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import Image from 'next/image'
+export const dynamic = 'force-dynamic'
 
 export default function NuevoServicioPage() {
   const supabase = createClient()

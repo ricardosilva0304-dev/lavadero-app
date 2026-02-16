@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion' // Librería de animaciones
+export const dynamic = 'force-dynamic'
 
 export default function LoginPage() {
     const [cedula, setCedula] = useState('')
