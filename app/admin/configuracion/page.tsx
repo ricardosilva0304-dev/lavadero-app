@@ -84,19 +84,25 @@ export default function ConfiguracionPage() {
   }
 
   const actualizarTarifa = async (tipo: 'carro' | 'moto', precios: any) => {
+    // Verificamos que los datos sean números antes de enviar
+    const datosActualizados = {
+      precio_hora: Number(precios.hora),
+      precio_noche: Number(precios.noche),
+      precio_dia: Number(precios.dia),
+      precio_mes: Number(precios.mes),
+      actualizado_en: new Date().toISOString()
+    }
+
     const { error } = await supabase
       .from('config_parqueadero')
-      .update({
-        precio_hora: precios.hora,
-        precio_noche: precios.noche,
-        precio_dia: precios.dia,
-        precio_mes: precios.mes,
-        actualizado_en: new Date().toISOString()
-      })
-      .eq('tipo_vehiculo', tipo)
+      .update(datosActualizados)
+      .eq('tipo_vehiculo', tipo) // Filtramos por 'carro' o 'moto'
 
-    if (!error) {
-      fetchData(); // Recargar datos
+    if (error) {
+      console.error("Error al actualizar:", error.message)
+      alert("Error de base de datos: " + error.message)
+    } else {
+      fetchData() // Recargar para ver los cambios
     }
   }
 
