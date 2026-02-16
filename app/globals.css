@@ -1,0 +1,62 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --gorilla-orange: #F47F20;
+  --gorilla-purple: #8B5CF6;
+}
+
+body {
+  background-color: #0E0C15;
+  color: white;
+  /* Fuente tipo "Geist" o "Inter" para verse moderno */
+  font-family: 'Inter', sans-serif;
+}
+
+/* Animación para el borde del botón de login */
+@keyframes gradient-x {
+  0% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+.animate-gradient-x {
+  background-size: 200% 200%;
+  animation: gradient-x 3s ease infinite;
+}
+
+/* Scrollbar personalizada Gorilla */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #0a0a0c;
+}
+::-webkit-scrollbar-thumb {
+  background: #F47F20;
+  border-radius: 10px;
+}
+
+@media print {
+  /* Ocultar todo lo que no sea el recibo */
+  body * {
+    visibility: hidden;
+  }
+  #ticket-impresion, #ticket-impresion * {
+    visibility: visible;
+  }
+  #ticket-impresion {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    color: black !important;
+    background: white !important;
+  }
+  /* Ajuste para papel térmico */
+  @page {
+    margin: 0;
+    size: auto;
+  }
+}
