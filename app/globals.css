@@ -1,52 +1,48 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
-/* Aquí abajo va el resto de tu CSS personalizado */
-:root {
-  --gorilla-orange: #F47F20;
-  --gorilla-purple: #8B5CF6;
+@theme {
+  /* Definimos tus colores Gorilla aquí para que Tailwind los reconozca */
+  --color-gorilla-dark: #0E0C15;
+  --color-gorilla-orange: #F47F20;
+  --color-gorilla-purple: #8B5CF6;
+
+  /* Animación personalizada */
+  --animate-spin-slow: spin 3s linear infinite;
 }
 
+/* Estilos base */
 body {
-  background-color: #0E0C15;
+  background-color: var(--color-gorilla-dark);
   color: white;
-  /* Fuente tipo "Geist" o "Inter" para verse moderno */
-  font-family: 'Inter', sans-serif;
+  font-family: Arial, Helvetica, sans-serif;
 }
 
-/* Animación para el borde del botón de login */
-@keyframes gradient-x {
-  0% { background-position: 0% 50%; }
-  50% { background-position: 100% 50%; }
-  100% { background-position: 0% 50%; }
-}
-
-.animate-gradient-x {
-  background-size: 200% 200%;
-  animation: gradient-x 3s ease infinite;
-}
-
-/* Scrollbar personalizada Gorilla */
+/* Scrollbar personalizada */
 ::-webkit-scrollbar {
   width: 8px;
 }
+
 ::-webkit-scrollbar-track {
-  background: #0a0a0c;
+  background: var(--color-gorilla-dark);
 }
+
 ::-webkit-scrollbar-thumb {
-  background: #F47F20;
+  background: var(--color-gorilla-orange);
   border-radius: 10px;
 }
 
 @media print {
+
   /* Ocultar todo lo que no sea el recibo */
   body * {
     visibility: hidden;
   }
-  #ticket-impresion, #ticket-impresion * {
+
+  #ticket-impresion,
+  #ticket-impresion * {
     visibility: visible;
   }
+
   #ticket-impresion {
     position: absolute;
     left: 0;
@@ -55,6 +51,7 @@ body {
     color: black !important;
     background: white !important;
   }
+
   /* Ajuste para papel térmico */
   @page {
     margin: 0;
