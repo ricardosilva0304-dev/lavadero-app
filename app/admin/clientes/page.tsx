@@ -19,23 +19,42 @@ export default function BaseClientesPage() {
   }, [])
 
   const fetchClientes = async () => {
-    setLoading(true)
-    // Esta consulta trae al cliente y CUENTA sus registros en ordenes_servicio
-    const { data, error } = await supabase
-      .from('clientes')
-      .select(`
-      *,
-      ordenes_servicio!cliente_id (count)
-    `)
-      .order('nombre', { ascending: true })
+    setLoading(true);
+    console.log("Iniciando carga de clientes...");
 
-    if (error) {
-      console.error("Error cargando clientes:", error)
-    } else {
-      setClientes(data || [])
+    try {
+      // Intentamos una consulta más robusta y explícita
+      const { data, error } = await supabase
+        .from('clientes')
+        .select(`
+          id,
+          cedula,
+          nombre,
+          telefono,
+          creado_en,
+          ordenes_servicio!ordenes_servicio_cliente_id_fkey (count)
+        `)
+        .order('nombre', { ascending: true });
+
+      if (error) {
+        console.error("Error SQL detallado:", error);
+
+        // Si falla el conteo, intentamos traer al menos los clientes básicos
+        const { data: fallbackData } = await supabase.from('clientes').select('*');
+        if (fallbackData) {
+          // Mapeamos para que el diseño no se rompa aunque no tenga conteo
+          setClientes(fallbackData.map(c => ({ ...c, ordenes_servicio: [{ count: 0 }] })));
+        }
+      } else {
+        console.log("Clientes cargados:", data);
+        setClientes(data || []);
+      }
+    } catch (err) {
+      console.error("Error inesperado:", err);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false)
-  }
+  };
 
   const eliminarCliente = async (id: string) => {
     if (confirm('¿ELIMINAR CLIENTE? Esto borrará todo su historial.')) {
