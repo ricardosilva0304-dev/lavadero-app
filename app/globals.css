@@ -2,6 +2,7 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Aquí abajo va el resto de tu CSS personalizado */
 :root {
   --gorilla-orange: #F47F20;
   --gorilla-purple: #8B5CF6;
