@@ -309,14 +309,11 @@ function FormInput({ label, dark, icon, ...props }: any) {
 // Reemplaza el componente TarifaCard y MiniInput por estos:
 
 function TarifaCard({ tipo, icono, valores, onSave }: any) {
-  const [vals, setVals] = useState({ hora: 0, noche: 0, dia: 0, mes: 0 })
+  const [vals, setVals] = useState({ dia: 0, mes: 0 })
   const [saved, setSaved] = useState(false)
 
   useEffect(() => {
-    // Añadimos valores?. para que si es undefined no de error
     setVals({
-      hora: valores?.precio_hora || 0,
-      noche: valores?.precio_noche || 0,
       dia: valores?.precio_dia || 0,
       mes: valores?.precio_mes || 0
     })
@@ -328,20 +325,17 @@ function TarifaCard({ tipo, icono, valores, onSave }: any) {
         <div className="p-4 bg-slate-900 text-white rounded-2xl shadow-lg">{icono}</div>
         <h3 className="text-2xl font-black italic uppercase text-slate-900 tracking-tighter">{tipo}</h3>
       </div>
-
-      <div className="grid grid-cols-2 gap-4">
-        {/* CORRECCIÓN: Se añadió (v: any) en cada onChange */}
-        <MiniInput label="Hora" value={vals.hora} onChange={(v: any) => setVals({ ...vals, hora: v })} />
-        <MiniInput label="Noche" value={vals.noche} onChange={(v: any) => setVals({ ...vals, noche: v })} />
-        <MiniInput label="Día" value={vals.dia} onChange={(v: any) => setVals({ ...vals, dia: v })} />
-        <MiniInput label="Mes" value={vals.mes} onChange={(v: any) => setVals({ ...vals, mes: v })} />
+      
+      <div className="grid grid-cols-1 gap-6">
+        <MiniInput label="Precio por Día" value={vals.dia} onChange={(v: any) => setVals({...vals, dia: v})} />
+        <MiniInput label="Precio por Mes" value={vals.mes} onChange={(v: any) => setVals({...vals, mes: v})} />
       </div>
 
-      <button
-        onClick={() => { onSave(tipo, vals); setSaved(true); setTimeout(() => setSaved(false), 2000) }}
-        className={`w-full mt-6 p-4 rounded-2xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 transition-all ${saved ? 'bg-green-500 text-white' : 'bg-slate-900 text-white hover:bg-black shadow-lg'}`}
+      <button 
+        onClick={() => {onSave(tipo, vals); setSaved(true); setTimeout(() => setSaved(false), 2000)}}
+        className={`w-full mt-8 p-5 rounded-2xl font-black uppercase text-xs tracking-widest flex items-center justify-center gap-2 transition-all ${saved ? 'bg-green-500 text-white' : 'bg-slate-900 text-white hover:bg-black shadow-lg'}`}
       >
-        {saved ? <><Check size={16} /> Tarifas Guardadas</> : <><Save size={16} /> Actualizar Precios</>}
+        {saved ? <><Check size={18}/> Tarifas Guardadas</> : <><Save size={18}/> Actualizar Precios</>}
       </button>
     </div>
   )
