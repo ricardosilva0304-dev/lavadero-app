@@ -12,13 +12,13 @@ import 'react-toastify/dist/ReactToastify.css';
 const dynamic = 'force-dynamic'
 
 // --- Utilidades ---
-const formatearPrecio = (valor: number) => 
+const formatearPrecio = (valor: number) =>
   new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(valor);
 
 const Notification = ({ title, description, type }: { title: string, description: string, type: 'success' | 'error' | 'info' | 'warning' }) => (
   <div className="flex items-center gap-3">
     <div className={`p-2 rounded-xl ${type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500'} text-white shadow-lg`}>
-      {type === 'success' ? <Check size={18} strokeWidth={3}/> : <Zap size={18} />}
+      {type === 'success' ? <Check size={18} strokeWidth={3} /> : <Zap size={18} />}
     </div>
     <div>
       <p className="font-black text-[10px] uppercase tracking-wider leading-none mb-1">{title}</p>
@@ -80,49 +80,67 @@ export default function NuevoServicioPage() {
 
   // --- DISEÑO DE IMPRESIÓN MEJORADO ---
   const imprimirRecibo = (datos: any) => {
-    const nombreEmpleado = empleados.find(e => e.id === empleadoAsignado)?.nombre || 'General';
-    const fecha = new Date().toLocaleString('es-CO');
-    
+    const nombreEmpleado = empleados.find(e => e.id === empleadoAsignado)?.nombre || 'General'
+    const logoUrl = window.location.origin + '/logo.png'; // Ruta de tu logo en /public
+    const nCli = cliente?.nombre || nombreNuevoCliente || 'Cliente General';
+    const cCli = cliente?.cedula || busquedaCedula || 'N/A';
+
     const ticketHTML = `
       <html>
         <head>
           <style>
+            @import url('https://fonts.googleapis.com/css2?family=Courier+Prime:wght@400;700&display=swap');
             @page { size: 80mm auto; margin: 0; }
             body { 
-              font-family: 'Courier New', Courier, monospace; 
-              width: 72mm; padding: 4mm; color: #000; font-size: 12px; line-height: 1.2;
+              font-family: 'Courier Prime', monospace; 
+              width: 74mm; 
+              padding: 4mm; 
+              color: #000; 
+              font-size: 12px; 
+              line-height: 1.2;
             }
-            .header { text-align: center; margin-bottom: 10px; border-bottom: 1px dashed #000; padding-bottom: 10px; }
-            .logo { font-size: 20px; font-weight: bold; }
-            .info { font-size: 11px; margin-bottom: 5px; }
-            .plate-box { 
-              border: 2px solid #000; margin: 10px 0; text-align: center; 
-              padding: 5px; font-size: 28px; font-weight: bold; 
-            }
+            .center { text-align: center; }
+            .bold { font-weight: 700; }
+            .logo { width: 40mm; margin: 0 auto 5px; display: block; filter: grayscale(1); }
             .divider { border-top: 1px dashed #000; margin: 8px 0; }
+            .plate-box { 
+              border: 2px solid #000; 
+              padding: 8px; 
+              margin: 10px 0; 
+              font-size: 28px; 
+              font-weight: 700; 
+              text-align: center; 
+              letter-spacing: 2px;
+            }
             .item { display: flex; justify-content: space-between; margin-bottom: 3px; }
-            .total-section { font-size: 16px; font-weight: bold; margin-top: 10px; }
-            .footer { text-align: center; font-size: 10px; margin-top: 20px; }
-            .bold { font-weight: bold; }
+            .total { 
+              font-size: 20px; 
+              font-weight: 700; 
+              margin-top: 10px; 
+              display: flex; 
+              justify-content: space-between; 
+              border-top: 1px dashed #000;
+              padding-top: 5px;
+            }
+            .footer { font-size: 10px; margin-top: 15px; line-height: 1.5; }
           </style>
         </head>
-        <body onload="window.print(); window.close();">
-          <div class="header">
-            <div class="logo">ECOPLANET KONG</div>
-            <div class="info italic font-bold text-lg">NIT: 123.456.789-0</div>
-            <div class="info text-sm">CALLE 123 # 45 - 67, CIUDAD</div>
-            <div class="info text-sm">TEL: (604) 123 4567</div>
+        <body>
+          <div class="center">
+            <img src="${logoUrl}" class="logo" />
+            <div class="bold" style="font-size: 18px;">ECOPLANET KONG</div>
+            <div style="font-size: 10px;">CALLE 14 # 3 - 08, SOACHA</div>
+            <div style="font-size: 10px;">TEL: 310 337 5612</div>
           </div>
 
+          <div class="divider"></div>
           <div class="plate-box">${datos.placa}</div>
 
-          <div class="info">
-            <div><span class="bold">ORDEN:</span> #${datos.id.toString().slice(-6).toUpperCase()}</div>
-            <div><span class="bold">FECHA:</span> ${fecha}</div>
-            <div><span class="bold">CLIENTE:</span> ${nombreNuevoCliente || 'Particular'}</div>
-            <div><span class="bold">TIPO:</span> ${datos.tipo_vehiculo.toUpperCase()}</div>
-            <div><span class="bold">OPERARIO:</span> ${nombreEmpleado}</div>
-          </div>
+          <div><b>ORDEN:</b> #${datos.id.split('-')[0].toUpperCase()}</div>
+          <div><b>FECHA:</b> ${new Date().toLocaleString()}</div>
+          <div><b>CLIENTE:</b> ${nCli.toUpperCase()}</div>
+          <div><b>TIPO:</b> ${datos.tipo_vehiculo.toUpperCase()}</div>
+          <div><b>OPERARIO:</b> ${nombreEmpleado.toUpperCase()}</div>
 
           <div class="divider"></div>
           <div class="bold" style="margin-bottom: 5px;">SERVICIOS</div>
@@ -133,23 +151,54 @@ export default function NuevoServicioPage() {
             </div>
           `).join('')}
 
-          <div class="divider"></div>
-          <div class="item total-section">
+          <div class="total">
             <span>TOTAL:</span>
             <span>$${totalOrden.toLocaleString()}</span>
           </div>
-          <div class="info">PAGO: ${metodoPago.toUpperCase()}</div>
+          <div style="font-size: 10px; margin-top: 5px;">PAGO: ${metodoPago.toUpperCase()}</div>
 
-          <div class="footer">
+          <div class="center footer">
             <p>¡Gracias por confiar en el mejor equipo!</p>
-            <p>Siguenos en Instagram: @ecoplanetkong</p>
-            <p>*** Software de Gestión Pro ***</p>
           </div>
+
+          <script>
+            // Pequeño script interno para asegurar que el logo cargue antes de imprimir
+            window.onload = function() {
+              window.print();
+              setTimeout(() => { window.close(); }, 500);
+            };
+          </script>
         </body>
       </html>
     `
-    const win = window.open('', '_blank', 'width=400,height=600');
-    win?.document.write(ticketHTML);
+
+    // --- LÓGICA DE IFRAME INVISIBLE ---
+    const iframe = document.createElement('iframe');
+    iframe.style.position = 'fixed';
+    iframe.style.right = '0';
+    iframe.style.bottom = '0';
+    iframe.style.width = '0';
+    iframe.style.height = '0';
+    iframe.style.border = '0';
+    document.body.appendChild(iframe);
+
+    const doc = iframe.contentWindow?.document;
+    if (doc) {
+      doc.open();
+      doc.write(ticketHTML);
+      doc.close();
+
+      // Disparar impresión
+      iframe.contentWindow?.focus();
+      // Le damos un momento para que cargue el logo antes de imprimir
+      setTimeout(() => {
+        iframe.contentWindow?.print();
+        // Limpiamos el DOM eliminando el iframe después de 2 segundos
+        setTimeout(() => {
+          document.body.removeChild(iframe);
+        }, 2000);
+      }, 500);
+    }
   }
 
   const crearOrden = async () => {
@@ -170,20 +219,31 @@ export default function NuevoServicioPage() {
         servicios_ids: serviciosSeleccionados.map(s => s.id), nombres_servicios: serviciosSeleccionados.map(s => s.nombre).join(', '),
         total: totalOrden, metodo_pago: metodoPago, empleado_id: empleadoAsignado, estado: 'pendiente'
       }]).select().single()
-      
-      if (!error && ord) { 
+
+      if (!error && ord) {
+        // 1. Mandamos a imprimir (usará el iframe invisible)
         imprimirRecibo(ord); 
+        
+        // 2. Mostramos el modal de éxito de una vez
         setOrdenFinalizada(true); 
+
+        // 3. Opcional: Feedback visual de éxito
+        toast.success("Servicio registrado e imprimiendo...");
       }
-    } catch (e) { console.error(e) } finally { setLoading(false) }
+    } catch (e) {
+      console.error(e);
+      toast.error("Error al procesar la orden");
+    } finally {
+      setLoading(false)
+    }
   }
 
   return (
     <div className="min-h-screen bg-[#F1F5F9] text-slate-900 p-4 md:p-8 pb-40">
       <ToastContainer />
-      
+
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-6xl mx-auto">
-        
+
         {/* HEADER */}
         <header className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
@@ -198,10 +258,10 @@ export default function NuevoServicioPage() {
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          
+
           {/* COLUMNA IZQUIERDA: VEHICULO Y SERVICIOS */}
           <div className="lg:col-span-7 space-y-6">
-            
+
             {/* 1. VEHÍCULO */}
             <section className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200">
               <div className="flex justify-between items-center mb-6">
@@ -224,7 +284,7 @@ export default function NuevoServicioPage() {
                     <span className="text-[8px] font-black text-black/40 tracking-[0.3em]">COLOMBIA</span>
                     <div className="w-2 h-2 rounded-full bg-black/10" />
                   </div>
-                  <input 
+                  <input
                     placeholder="ABC 123"
                     className="w-full bg-transparent border-none text-6xl font-black text-center uppercase tracking-tighter text-slate-900 outline-none placeholder:text-black/5"
                     value={placa} onChange={e => setPlaca(e.target.value.toUpperCase())}
@@ -244,11 +304,11 @@ export default function NuevoServicioPage() {
                   const sel = serviciosSeleccionados.find(s => s.id === srv.id)
                   const precio = tipoVehiculo === 'carro' ? srv.precio_carro : srv.precio_moto;
                   return (
-                    <button key={srv.id} onClick={() => toggleServicio(srv)} 
+                    <button key={srv.id} onClick={() => toggleServicio(srv)}
                       className={`flex flex-col p-4 rounded-2xl border-2 transition-all text-left ${sel ? 'bg-orange-50 border-gorilla-orange' : 'bg-slate-50 border-transparent hover:border-slate-200'}`}>
                       <div className="flex justify-between items-start mb-2">
                         <div className={`p-2 rounded-lg ${sel ? 'bg-gorilla-orange text-white' : 'bg-white text-slate-300 shadow-sm'}`}>
-                          {sel ? <Check size={14} strokeWidth={3}/> : <Plus size={14}/>}
+                          {sel ? <Check size={14} strokeWidth={3} /> : <Plus size={14} />}
                         </div>
                         <span className={`font-black text-sm ${sel ? 'text-slate-900' : 'text-slate-400'}`}>{formatearPrecio(precio)}</span>
                       </div>
@@ -262,7 +322,7 @@ export default function NuevoServicioPage() {
 
           {/* COLUMNA DERECHA: CLIENTE Y ASIGNACIÓN */}
           <div className="lg:col-span-5 space-y-6">
-            
+
             {/* 3. CLIENTE */}
             <section className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200">
               <span className="bg-slate-900 text-white text-[10px] px-3 py-1 rounded-full font-black uppercase tracking-tighter mb-6 inline-block">03. Datos Cliente</span>
@@ -272,12 +332,12 @@ export default function NuevoServicioPage() {
                   <input placeholder="Cédula" className="w-full bg-slate-50 border border-slate-100 p-4 pl-12 rounded-2xl outline-none focus:ring-2 ring-gorilla-purple/20 transition-all font-bold"
                     value={busquedaCedula} onChange={e => setBusquedaCedula(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && buscarCliente()} />
                 </div>
-                <button onClick={buscarCliente} className="bg-gorilla-purple text-white px-5 rounded-2xl shadow-lg shadow-purple-100 hover:scale-105 transition-all"><Search size={20}/></button>
+                <button onClick={buscarCliente} className="bg-gorilla-purple text-white px-5 rounded-2xl shadow-lg shadow-purple-100 hover:scale-105 transition-all"><Search size={20} /></button>
               </div>
-              
+
               <AnimatePresence mode="wait">
                 {cliente && (
-                  <motion.div initial={{height:0, opacity:0}} animate={{height:'auto', opacity:1}} className="space-y-3 pt-2">
+                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} className="space-y-3 pt-2">
                     <div className="relative">
                       <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
                       <input placeholder="Nombre Completo" className="w-full bg-slate-50 border border-slate-100 p-4 pl-12 rounded-xl outline-none font-bold uppercase text-xs" value={nombreNuevoCliente} onChange={e => setNombreNuevoCliente(e.target.value)} />
@@ -329,9 +389,9 @@ export default function NuevoServicioPage() {
               {serviciosSeleccionados.length > 3 && <span className="text-[9px] font-bold text-slate-500">+{serviciosSeleccionados.length - 3}</span>}
             </div>
           </div>
-          <button 
-            onClick={crearOrden} 
-            disabled={loading || !placa} 
+          <button
+            onClick={crearOrden}
+            disabled={loading || !placa}
             className="w-full md:w-auto bg-gorilla-orange hover:bg-orange-600 px-10 py-5 rounded-[2rem] font-black text-sm uppercase italic tracking-widest flex items-center justify-center gap-3 transition-all active:scale-95 disabled:opacity-50"
           >
             {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <>PROCESAR Y RECIBO <Printer size={18} /></>}
@@ -342,8 +402,8 @@ export default function NuevoServicioPage() {
       {/* SUCCESS MODAL */}
       <AnimatePresence>
         {ordenFinalizada && (
-          <motion.div initial={{opacity:0}} animate={{opacity:1}} className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/80 backdrop-blur-sm">
-            <motion.div initial={{scale:0.9, y:20}} animate={{scale:1, y:0}} className="bg-white p-10 rounded-[3rem] text-center max-w-sm w-full shadow-2xl">
+          <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/80 backdrop-blur-sm">
+            <motion.div initial={{ scale: 0.9, y: 20 }} animate={{ scale: 1, y: 0 }} className="bg-white p-10 rounded-[3rem] text-center max-w-sm w-full shadow-2xl">
               <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl shadow-green-200">
                 <Check size={40} className="text-white" strokeWidth={4} />
               </div>
