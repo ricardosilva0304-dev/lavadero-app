@@ -3,24 +3,26 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import {
   Search, Car, Bike, CreditCard,
-  DollarSign, User, Hash, Plus, Printer, Check, Zap, UserPlus, XCircle
+  DollarSign, User, Hash, Plus, Printer, Check, Zap, UserPlus, XCircle, ChevronRight, MapPin, Phone
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Bounce, ToastContainer, toast, ToastOptions, ToastPosition } from 'react-toastify';
+import { Bounce, ToastContainer, toast, ToastOptions } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 const dynamic = 'force-dynamic'
 
+// --- Utilidades ---
+const formatearPrecio = (valor: number) => 
+  new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(valor);
+
 const Notification = ({ title, description, type }: { title: string, description: string, type: 'success' | 'error' | 'info' | 'warning' }) => (
-  <div className="flex items-center">
-    <div className={`p-2 rounded-full mr-3 ${
-      type === 'success' ? 'bg-green-500' : 
-      type === 'error' ? 'bg-red-500' : 'bg-blue-500'} text-white shadow-lg`}>
-      {type === 'success' ? <Check size={16} strokeWidth={3}/> : <Zap size={16} />}
+  <div className="flex items-center gap-3">
+    <div className={`p-2 rounded-xl ${type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500'} text-white shadow-lg`}>
+      {type === 'success' ? <Check size={18} strokeWidth={3}/> : <Zap size={18} />}
     </div>
     <div>
-      <p className="font-black text-xs uppercase tracking-widest leading-none mb-1">{title}</p>
-      <p className="text-[10px] text-gray-500 font-bold uppercase">{description}</p>
+      <p className="font-black text-[10px] uppercase tracking-wider leading-none mb-1">{title}</p>
+      <p className="text-[11px] opacity-80 font-medium uppercase">{description}</p>
     </div>
   </div>
 );
@@ -61,10 +63,10 @@ export default function NuevoServicioPage() {
       const { data } = await supabase.from('clientes').select('*').eq('cedula', busquedaCedula).maybeSingle()
       if (data) {
         setCliente(data); setNombreNuevoCliente(data.nombre); setTelNuevoCliente(data.telefono);
-        toast.success(<Notification title="Sistema" description="Cliente reconocido" type="success" />, toastOptions);
+        toast.success(<Notification title="SISTEMA" description="Cliente reconocido" type="success" />, toastOptions);
       } else {
         setCliente({ nuevo: true });
-        toast.info(<Notification title="Registro" description="Nuevo cliente" type="info" />, toastOptions);
+        toast.info(<Notification title="REGISTRO" description="Nuevo cliente detectado" type="info" />, toastOptions);
       }
     } finally { setLoading(false) }
   }
@@ -76,37 +78,83 @@ export default function NuevoServicioPage() {
 
   const totalOrden = serviciosSeleccionados.reduce((acc, s) => acc + (tipoVehiculo === 'carro' ? s.precio_carro : s.precio_moto), 0)
 
+  // --- DISEÑO DE IMPRESIÓN MEJORADO ---
   const imprimirRecibo = (datos: any) => {
+    const nombreEmpleado = empleados.find(e => e.id === empleadoAsignado)?.nombre || 'General';
+    const fecha = new Date().toLocaleString('es-CO');
+    
     const ticketHTML = `
       <html>
         <head>
           <style>
             @page { size: 80mm auto; margin: 0; }
-            body { font-family: sans-serif; width: 70mm; padding: 5mm; color: #000; }
-            .center { text-align: center; }
+            body { 
+              font-family: 'Courier New', Courier, monospace; 
+              width: 72mm; padding: 4mm; color: #000; font-size: 12px; line-height: 1.2;
+            }
+            .header { text-align: center; margin-bottom: 10px; border-bottom: 1px dashed #000; padding-bottom: 10px; }
+            .logo { font-size: 20px; font-weight: bold; }
+            .info { font-size: 11px; margin-bottom: 5px; }
+            .plate-box { 
+              border: 2px solid #000; margin: 10px 0; text-align: center; 
+              padding: 5px; font-size: 28px; font-weight: bold; 
+            }
+            .divider { border-top: 1px dashed #000; margin: 8px 0; }
+            .item { display: flex; justify-content: space-between; margin-bottom: 3px; }
+            .total-section { font-size: 16px; font-weight: bold; margin-top: 10px; }
+            .footer { text-align: center; font-size: 10px; margin-top: 20px; }
             .bold { font-weight: bold; }
-            .plate { font-size: 24px; font-weight: 900; border: 2px solid #000; padding: 5px; margin: 10px 0; text-align: center; }
           </style>
         </head>
         <body onload="window.print(); window.close();">
-          <div class="center bold">ECOPLANET KONG</div>
-          <div class="plate">${datos.placa}</div>
-          <div style="font-size: 10px;">
-            <p>FECHA: ${new Date().toLocaleString()}</p>
-            <p>TIPO: ${datos.tipo_vehiculo.toUpperCase()}</p>
-            <hr>
-            <p><b>TOTAL: $${totalOrden.toLocaleString()}</b></p>
+          <div class="header">
+            <div class="logo">ECOPLANET KONG</div>
+            <div class="info italic font-bold text-lg">NIT: 123.456.789-0</div>
+            <div class="info text-sm">CALLE 123 # 45 - 67, CIUDAD</div>
+            <div class="info text-sm">TEL: (604) 123 4567</div>
+          </div>
+
+          <div class="plate-box">${datos.placa}</div>
+
+          <div class="info">
+            <div><span class="bold">ORDEN:</span> #${datos.id.toString().slice(-6).toUpperCase()}</div>
+            <div><span class="bold">FECHA:</span> ${fecha}</div>
+            <div><span class="bold">CLIENTE:</span> ${nombreNuevoCliente || 'Particular'}</div>
+            <div><span class="bold">TIPO:</span> ${datos.tipo_vehiculo.toUpperCase()}</div>
+            <div><span class="bold">OPERARIO:</span> ${nombreEmpleado}</div>
+          </div>
+
+          <div class="divider"></div>
+          <div class="bold" style="margin-bottom: 5px;">SERVICIOS</div>
+          ${serviciosSeleccionados.map(s => `
+            <div class="item">
+              <span>${s.nombre.toUpperCase()}</span>
+              <span>$${(tipoVehiculo === 'carro' ? s.precio_carro : s.precio_moto).toLocaleString()}</span>
+            </div>
+          `).join('')}
+
+          <div class="divider"></div>
+          <div class="item total-section">
+            <span>TOTAL:</span>
+            <span>$${totalOrden.toLocaleString()}</span>
+          </div>
+          <div class="info">PAGO: ${metodoPago.toUpperCase()}</div>
+
+          <div class="footer">
+            <p>¡Gracias por confiar en el mejor equipo!</p>
+            <p>Siguenos en Instagram: @ecoplanetkong</p>
+            <p>*** Software de Gestión Pro ***</p>
           </div>
         </body>
       </html>
     `
-    const win = window.open('', '_blank', 'width=300,height=600');
+    const win = window.open('', '_blank', 'width=400,height=600');
     win?.document.write(ticketHTML);
   }
 
   const crearOrden = async () => {
     if (!placa || serviciosSeleccionados.length === 0 || !empleadoAsignado || !busquedaCedula) {
-      toast.error(<Notification title="Error" description="Faltan datos" type="error" />, toastOptions); return;
+      toast.error(<Notification title="ERROR" description="Faltan datos obligatorios" type="error" />, toastOptions); return;
     }
     setLoading(true)
     try {
@@ -122,73 +170,89 @@ export default function NuevoServicioPage() {
         servicios_ids: serviciosSeleccionados.map(s => s.id), nombres_servicios: serviciosSeleccionados.map(s => s.nombre).join(', '),
         total: totalOrden, metodo_pago: metodoPago, empleado_id: empleadoAsignado, estado: 'pendiente'
       }]).select().single()
-      if (!error && ord) { imprimirRecibo(ord); setOrdenFinalizada(true); }
+      
+      if (!error && ord) { 
+        imprimirRecibo(ord); 
+        setOrdenFinalizada(true); 
+      }
     } catch (e) { console.error(e) } finally { setLoading(false) }
   }
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 p-4 md:p-10 pb-80 lg:pb-40 relative">
+    <div className="min-h-screen bg-[#F1F5F9] text-slate-900 p-4 md:p-8 pb-40">
       <ToastContainer />
       
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="max-w-7xl mx-auto">
+      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-6xl mx-auto">
         
-        <header className="mb-10 flex items-center justify-between">
+        {/* HEADER */}
+        <header className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="flex items-center gap-4">
-            <div className="bg-gorilla-orange w-2 h-12 rounded-full shadow-lg shadow-orange-200" />
+            <div className="bg-gorilla-orange w-3 h-14 rounded-full" />
             <div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] leading-none mb-1">Operaciones</p>
-              <h1 className="text-4xl md:text-5xl font-black tracking-tighter uppercase italic leading-none">Nuevo <span className="text-gorilla-orange">Servicio</span></h1>
+              <h1 className="text-4xl font-black tracking-tight uppercase italic leading-none">
+                Nuevo <span className="text-gorilla-orange">Servicio</span>
+              </h1>
+              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-1">Terminal de Ventas | Ecoplanet Kong</p>
             </div>
           </div>
         </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
           
-          {/* PANEL IZQUIERDO */}
-          <div className="lg:col-span-7 space-y-8">
-            {/* VEHÍCULO */}
-            <section className="bg-white rounded-[3rem] p-8 md:p-10 shadow-2xl shadow-slate-200 border border-white relative overflow-hidden group">
-              <div className="flex flex-col md:flex-row justify-between items-center gap-6 mb-10">
-                <h2 className="text-xs font-black text-slate-400 uppercase tracking-[0.3em] flex items-center gap-3">
-                  <Zap size={16} className="text-gorilla-orange fill-gorilla-orange" /> 1. Vehículo
-                </h2>
-                <div className="flex bg-slate-100 p-1.5 rounded-2xl gap-2 w-full md:w-auto">
-                  <button onClick={() => setTipoVehiculo('carro')} className={`flex-1 md:px-8 py-3 rounded-xl font-black text-[10px] transition-all flex items-center justify-center gap-2 ${tipoVehiculo === 'carro' ? 'bg-white text-gorilla-orange shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}>
-                    <Car size={16} /> CARRO
+          {/* COLUMNA IZQUIERDA: VEHICULO Y SERVICIOS */}
+          <div className="lg:col-span-7 space-y-6">
+            
+            {/* 1. VEHÍCULO */}
+            <section className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200">
+              <div className="flex justify-between items-center mb-6">
+                <span className="bg-slate-900 text-white text-[10px] px-3 py-1 rounded-full font-black uppercase tracking-tighter">01. Identificación</span>
+                <div className="flex bg-slate-100 p-1 rounded-xl">
+                  <button onClick={() => setTipoVehiculo('carro')} className={`px-4 py-2 rounded-lg font-black text-[10px] transition-all flex items-center gap-2 ${tipoVehiculo === 'carro' ? 'bg-white text-gorilla-orange shadow-sm' : 'text-slate-400'}`}>
+                    <Car size={14} /> CARRO
                   </button>
-                  <button onClick={() => setTipoVehiculo('moto')} className={`flex-1 md:px-8 py-3 rounded-xl font-black text-[10px] transition-all flex items-center justify-center gap-2 ${tipoVehiculo === 'moto' ? 'bg-white text-gorilla-orange shadow-lg' : 'text-slate-400 hover:text-slate-600'}`}>
-                    <Bike size={16} /> MOTO
+                  <button onClick={() => setTipoVehiculo('moto')} className={`px-4 py-2 rounded-lg font-black text-[10px] transition-all flex items-center gap-2 ${tipoVehiculo === 'moto' ? 'bg-white text-gorilla-orange shadow-sm' : 'text-slate-400'}`}>
+                    <Bike size={14} /> MOTO
                   </button>
                 </div>
               </div>
-              <div className="bg-slate-900 rounded-[2.5rem] p-10 border-8 border-slate-800 shadow-inner relative group">
-                <div className="absolute top-4 left-6 text-slate-700 font-black text-xl italic tracking-tighter">COL</div>
-                <input 
-                  placeholder="ABC 123"
-                  className="w-full bg-transparent border-none text-6xl md:text-8xl font-black text-center uppercase tracking-tighter text-gorilla-orange outline-none placeholder:text-slate-800"
-                  value={placa} onChange={e => setPlaca(e.target.value.toUpperCase())}
-                />
+
+              {/* Diseño Placa Colombiana */}
+              <div className="max-w-xs mx-auto relative group">
+                <div className="absolute -inset-1 bg-gradient-to-r from-orange-400 to-yellow-400 rounded-2xl blur opacity-25 group-hover:opacity-50 transition duration-1000"></div>
+                <div className="relative bg-gradient-to-b from-yellow-300 to-yellow-400 rounded-xl p-4 border-4 border-black/10 shadow-lg">
+                  <div className="flex justify-between items-center px-4 mb-1">
+                    <span className="text-[8px] font-black text-black/40 tracking-[0.3em]">COLOMBIA</span>
+                    <div className="w-2 h-2 rounded-full bg-black/10" />
+                  </div>
+                  <input 
+                    placeholder="ABC 123"
+                    className="w-full bg-transparent border-none text-6xl font-black text-center uppercase tracking-tighter text-slate-900 outline-none placeholder:text-black/5"
+                    value={placa} onChange={e => setPlaca(e.target.value.toUpperCase())}
+                  />
+                </div>
               </div>
             </section>
 
-            {/* SERVICIOS */}
-            <section className="bg-white rounded-[3rem] p-8 md:p-10 shadow-2xl shadow-slate-200 border border-white">
-              <div className="flex justify-between items-center mb-8">
-                <h2 className="text-xs font-black text-slate-400 uppercase tracking-[0.3em]">2. Servicios</h2>
-                <span className="text-[10px] font-black bg-slate-100 px-3 py-1 rounded-full text-slate-500 uppercase">{serviciosSeleccionados.length} Seleccionados</span>
+            {/* 2. SERVICIOS */}
+            <section className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200">
+              <div className="flex justify-between items-center mb-6">
+                <span className="bg-slate-900 text-white text-[10px] px-3 py-1 rounded-full font-black uppercase tracking-tighter">02. Catálogo</span>
+                <span className="text-xs font-bold text-slate-400">{serviciosSeleccionados.length} Items</span>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[380px] overflow-y-auto pr-2 custom-scroll">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 max-h-[400px] overflow-y-auto pr-2 custom-scroll">
                 {serviciosDB.filter(s => s.aplica_a === tipoVehiculo || s.aplica_a === 'ambos').map(srv => {
                   const sel = serviciosSeleccionados.find(s => s.id === srv.id)
+                  const precio = tipoVehiculo === 'carro' ? srv.precio_carro : srv.precio_moto;
                   return (
-                    <button key={srv.id} onClick={() => toggleServicio(srv)} className={`flex justify-between items-center p-6 rounded-[2rem] border-2 transition-all group ${sel ? 'bg-purple-50 border-gorilla-purple shadow-xl shadow-purple-100' : 'bg-slate-50 border-transparent hover:bg-slate-100'}`}>
-                      <div className="flex items-center gap-4">
-                        <div className={`p-3 rounded-xl transition-all ${sel ? 'bg-gorilla-purple text-white rotate-[360deg]' : 'bg-white text-slate-300'}`}>
-                          {sel ? <Check size={18} strokeWidth={3}/> : <Plus size={18}/>}
+                    <button key={srv.id} onClick={() => toggleServicio(srv)} 
+                      className={`flex flex-col p-4 rounded-2xl border-2 transition-all text-left ${sel ? 'bg-orange-50 border-gorilla-orange' : 'bg-slate-50 border-transparent hover:border-slate-200'}`}>
+                      <div className="flex justify-between items-start mb-2">
+                        <div className={`p-2 rounded-lg ${sel ? 'bg-gorilla-orange text-white' : 'bg-white text-slate-300 shadow-sm'}`}>
+                          {sel ? <Check size={14} strokeWidth={3}/> : <Plus size={14}/>}
                         </div>
-                        <span className={`font-black uppercase italic text-xs tracking-tight ${sel ? 'text-gorilla-purple' : 'text-slate-600'}`}>{srv.nombre}</span>
+                        <span className={`font-black text-sm ${sel ? 'text-slate-900' : 'text-slate-400'}`}>{formatearPrecio(precio)}</span>
                       </div>
-                      <span className={`font-black text-sm ${sel ? 'text-slate-900' : 'text-slate-400'}`}>${(tipoVehiculo === 'carro' ? srv.precio_carro : srv.precio_moto).toLocaleString()}</span>
+                      <span className={`font-bold uppercase text-[11px] leading-tight ${sel ? 'text-gorilla-orange' : 'text-slate-600'}`}>{srv.nombre}</span>
                     </button>
                   )
                 })}
@@ -196,42 +260,51 @@ export default function NuevoServicioPage() {
             </section>
           </div>
 
-          {/* PANEL DERECHO */}
-          <div className="lg:col-span-5 space-y-8">
-            {/* CLIENTE */}
-            <section className="bg-white rounded-[3rem] p-8 shadow-2xl shadow-slate-200 border border-white">
-              <h2 className="text-xs font-black text-slate-400 uppercase tracking-[0.3em] mb-8 flex items-center gap-3">
-                <User size={16} className="text-gorilla-purple" /> 3. Cliente
-              </h2>
-              <div className="flex gap-3 mb-8">
-                <div className="relative flex-1 group">
-                  <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 group-focus-within:text-gorilla-purple" size={18} />
-                  <input placeholder="Cédula" className="w-full bg-slate-50 border-2 border-slate-100 p-5 pl-12 rounded-2xl outline-none focus:bg-white focus:border-gorilla-purple transition-all font-bold text-slate-900"
+          {/* COLUMNA DERECHA: CLIENTE Y ASIGNACIÓN */}
+          <div className="lg:col-span-5 space-y-6">
+            
+            {/* 3. CLIENTE */}
+            <section className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200">
+              <span className="bg-slate-900 text-white text-[10px] px-3 py-1 rounded-full font-black uppercase tracking-tighter mb-6 inline-block">03. Datos Cliente</span>
+              <div className="flex gap-2 mb-4 mt-4">
+                <div className="relative flex-1">
+                  <Hash className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                  <input placeholder="Cédula" className="w-full bg-slate-50 border border-slate-100 p-4 pl-12 rounded-2xl outline-none focus:ring-2 ring-gorilla-purple/20 transition-all font-bold"
                     value={busquedaCedula} onChange={e => setBusquedaCedula(e.target.value)} onKeyPress={(e) => e.key === 'Enter' && buscarCliente()} />
                 </div>
-                <button onClick={buscarCliente} className="bg-gorilla-purple hover:bg-purple-700 text-white p-5 rounded-2xl shadow-xl shadow-purple-200 active:scale-90 transition-all"><Search size={24}/></button>
+                <button onClick={buscarCliente} className="bg-gorilla-purple text-white px-5 rounded-2xl shadow-lg shadow-purple-100 hover:scale-105 transition-all"><Search size={20}/></button>
               </div>
+              
               <AnimatePresence mode="wait">
                 {cliente && (
-                  <motion.div initial={{opacity:0, scale:0.9}} animate={{opacity:1, scale:1}} exit={{opacity:0, scale:0.9}} className="space-y-4 p-6 bg-slate-50 rounded-[2rem] border border-slate-100">
-                    <input placeholder="Nombre" className="w-full bg-white border border-slate-100 p-4 rounded-xl outline-none font-bold uppercase text-sm" value={nombreNuevoCliente} onChange={e => setNombreNuevoCliente(e.target.value)} />
-                    <input placeholder="WhatsApp" className="w-full bg-white border border-slate-100 p-4 rounded-xl outline-none font-bold text-sm" value={telNuevoCliente} onChange={e => setTelNuevoCliente(e.target.value)} />
+                  <motion.div initial={{height:0, opacity:0}} animate={{height:'auto', opacity:1}} className="space-y-3 pt-2">
+                    <div className="relative">
+                      <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                      <input placeholder="Nombre Completo" className="w-full bg-slate-50 border border-slate-100 p-4 pl-12 rounded-xl outline-none font-bold uppercase text-xs" value={nombreNuevoCliente} onChange={e => setNombreNuevoCliente(e.target.value)} />
+                    </div>
+                    <div className="relative">
+                      <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                      <input placeholder="WhatsApp / Teléfono" className="w-full bg-slate-50 border border-slate-100 p-4 pl-12 rounded-xl outline-none font-bold text-xs" value={telNuevoCliente} onChange={e => setTelNuevoCliente(e.target.value)} />
+                    </div>
                   </motion.div>
                 )}
               </AnimatePresence>
             </section>
 
-            {/* PAGO & PERSONAL */}
-            <section className="bg-white rounded-[3rem] p-8 shadow-2xl shadow-slate-200 border border-white">
-              <h2 className="text-xs font-black text-slate-400 uppercase tracking-[0.3em] mb-8">4. Asignación</h2>
-              <div className="space-y-6">
-                <select className="w-full bg-slate-50 border-2 border-slate-100 p-5 rounded-2xl font-bold text-slate-700 outline-none focus:border-gorilla-orange appearance-none" value={empleadoAsignado} onChange={e => setEmpleadoAsignado(e.target.value)}>
-                  <option value="">Seleccionar Lavador...</option>
-                  {empleados.map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
-                </select>
-                <div className="flex gap-4">
-                  <button onClick={() => setMetodoPago('efectivo')} className={`flex-1 py-5 rounded-2xl font-black text-[10px] tracking-widest border-2 transition-all ${metodoPago === 'efectivo' ? 'bg-green-50 border-green-500 text-green-600 shadow-lg shadow-green-100' : 'bg-slate-50 border-transparent text-slate-400'}`}>EFECTIVO</button>
-                  <button onClick={() => setMetodoPago('transferencia')} className={`flex-1 py-5 rounded-2xl font-black text-[10px] tracking-widest border-2 transition-all ${metodoPago === 'transferencia' ? 'bg-blue-50 border-blue-500 text-blue-600 shadow-lg shadow-blue-100' : 'bg-slate-50 border-transparent text-slate-400'}`}>TRANSF.</button>
+            {/* 4. ASIGNACIÓN Y PAGO */}
+            <section className="bg-white rounded-3xl p-6 shadow-sm border border-slate-200">
+              <span className="bg-slate-900 text-white text-[10px] px-3 py-1 rounded-full font-black uppercase tracking-tighter mb-6 inline-block">04. Finalización</span>
+              <div className="space-y-4 mt-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase ml-2">Asignar Lavador</label>
+                  <select className="w-full bg-slate-50 border border-slate-100 p-4 rounded-2xl font-bold text-slate-700 outline-none appearance-none" value={empleadoAsignado} onChange={e => setEmpleadoAsignado(e.target.value)}>
+                    <option value="">Seleccionar...</option>
+                    {empleados.map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
+                  </select>
+                </div>
+                <div className="flex gap-2">
+                  <button onClick={() => setMetodoPago('efectivo')} className={`flex-1 py-4 rounded-2xl font-black text-[10px] border-2 transition-all ${metodoPago === 'efectivo' ? 'bg-green-50 border-green-500 text-green-600 shadow-sm' : 'bg-slate-50 border-transparent text-slate-400'}`}>EFECTIVO</button>
+                  <button onClick={() => setMetodoPago('transferencia')} className={`flex-1 py-4 rounded-2xl font-black text-[10px] border-2 transition-all ${metodoPago === 'transferencia' ? 'bg-blue-50 border-blue-500 text-blue-600 shadow-sm' : 'bg-slate-50 border-transparent text-slate-400'}`}>TRANSF.</button>
                 </div>
               </div>
             </section>
@@ -239,55 +312,55 @@ export default function NuevoServicioPage() {
         </div>
       </motion.div>
 
-      {/* BARRA INFERIOR FLOTANTE (DOCK) */}
-      <div className="fixed bottom-0 left-0 right-0 p-6 md:p-8 z-[100] pointer-events-none">
-        <div className="max-w-6xl mx-auto bg-white/80 backdrop-blur-3xl border border-white p-6 rounded-[3.5rem] shadow-[0_-20px_80px_rgba(0,0,0,0.1)] flex flex-col md:flex-row justify-between items-center gap-6 lg:ml-72 pointer-events-auto">
+      {/* FOOTER ACTION BAR (STICKY) */}
+      <div className="fixed bottom-6 left-1/2 -translate-x-1/2 w-[95%] max-w-5xl z-50">
+        <div className="bg-slate-900 text-white rounded-[2.5rem] p-4 pl-10 shadow-2xl flex flex-col md:flex-row justify-between items-center gap-4 border border-white/10">
           <div className="flex items-center gap-8">
             <div className="flex flex-col">
-              <p className="text-[10px] text-slate-400 font-black uppercase tracking-[0.3em] leading-none mb-2">Total Inversión</p>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest mb-1">Total a cobrar</p>
               <div className="flex items-baseline gap-2">
-                <span className="text-5xl font-black text-slate-900 tracking-tighter leading-none">${totalOrden.toLocaleString()}</span>
-                <span className="text-xs font-black text-slate-400 italic uppercase">COP</span>
+                <span className="text-4xl font-black tracking-tighter">{formatearPrecio(totalOrden)}</span>
               </div>
             </div>
-            {serviciosSeleccionados.length > 0 && (
-                <div className="hidden md:flex gap-2">
-                    {serviciosSeleccionados.slice(0,2).map((s,i) => (
-                        <div key={i} className="bg-slate-100 p-2 rounded-lg text-[8px] font-black uppercase italic">{s.nombre}</div>
-                    ))}
-                    {serviciosSeleccionados.length > 2 && <div className="bg-slate-900 text-white p-2 rounded-lg text-[8px] font-black">+{serviciosSeleccionados.length - 2}</div>}
-                </div>
-            )}
+            <div className="hidden md:flex gap-2">
+              {serviciosSeleccionados.slice(0, 3).map((s, i) => (
+                <span key={i} className="px-3 py-1 bg-white/10 rounded-full text-[9px] font-bold uppercase italic text-orange-400 border border-white/5">{s.nombre}</span>
+              ))}
+              {serviciosSeleccionados.length > 3 && <span className="text-[9px] font-bold text-slate-500">+{serviciosSeleccionados.length - 3}</span>}
+            </div>
           </div>
-          <button onClick={crearOrden} disabled={loading} className="w-full md:w-auto bg-gradient-to-r from-gorilla-orange to-orange-600 hover:to-orange-700 text-white px-12 py-6 rounded-[2.5rem] font-black text-xl italic uppercase tracking-[0.1em] shadow-[0_20px_50px_rgba(255,107,0,0.3)] disabled:opacity-50 flex items-center justify-center gap-4 transition-all active:scale-95 group">
-            {loading ? <div className="w-6 h-6 border-4 border-white border-t-transparent rounded-full animate-spin" /> : <>REGISTRAR & TIQUETE <Printer size={24} className="group-hover:rotate-12 transition-transform"/></>}
+          <button 
+            onClick={crearOrden} 
+            disabled={loading || !placa} 
+            className="w-full md:w-auto bg-gorilla-orange hover:bg-orange-600 px-10 py-5 rounded-[2rem] font-black text-sm uppercase italic tracking-widest flex items-center justify-center gap-3 transition-all active:scale-95 disabled:opacity-50"
+          >
+            {loading ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <>PROCESAR Y RECIBO <Printer size={18} /></>}
           </button>
         </div>
       </div>
 
-      {/* MODAL ÉXITO */}
+      {/* SUCCESS MODAL */}
       <AnimatePresence>
         {ordenFinalizada && (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-md">
-            <motion.div initial={{scale:0.8, opacity:0}} animate={{scale:1, opacity:1}} className="bg-white p-12 rounded-[4rem] text-center max-w-sm w-full shadow-2xl border border-white">
-              <div className="w-24 h-24 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-8 shadow-2xl shadow-green-200">
-                <Check size={54} className="text-white" strokeWidth={4} />
+          <motion.div initial={{opacity:0}} animate={{opacity:1}} className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/80 backdrop-blur-sm">
+            <motion.div initial={{scale:0.9, y:20}} animate={{scale:1, y:0}} className="bg-white p-10 rounded-[3rem] text-center max-w-sm w-full shadow-2xl">
+              <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl shadow-green-200">
+                <Check size={40} className="text-white" strokeWidth={4} />
               </div>
-              <h2 className="text-3xl font-black text-slate-900 uppercase italic leading-tight mb-4 tracking-tighter">Servicio<br/>Registrado</h2>
-              <p className="text-slate-400 font-bold mb-10 text-sm uppercase tracking-widest italic">Imprimiendo recibo...</p>
-              <button onClick={() => window.location.reload()} className="w-full bg-slate-900 hover:bg-black text-white font-black py-5 rounded-3xl uppercase tracking-widest shadow-xl transition-all">Nueva Orden</button>
+              <h2 className="text-2xl font-black text-slate-900 uppercase italic mb-2">¡Orden Exitosa!</h2>
+              <p className="text-slate-500 font-medium mb-8 text-sm">El tiquete se ha generado y la orden está en proceso.</p>
+              <button onClick={() => window.location.reload()} className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl uppercase tracking-widest text-xs hover:bg-black transition-all">Nueva Orden</button>
             </motion.div>
-          </div>
+          </motion.div>
         )}
       </AnimatePresence>
 
       <style jsx global>{`
-        .custom-scroll::-webkit-scrollbar { width: 6px; }
+        .custom-scroll::-webkit-scrollbar { width: 4px; }
         .custom-scroll::-webkit-scrollbar-track { background: transparent; }
-        .custom-scroll::-webkit-scrollbar-thumb { background: #e2e8f0; border-radius: 20px; }
+        .custom-scroll::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
         .bg-gorilla-orange { background-color: #FF6B00; }
         .text-gorilla-orange { color: #FF6B00; }
-        .border-gorilla-orange { border-color: #FF6B00; }
         .bg-gorilla-purple { background-color: #8B5CF6; }
       `}</style>
     </div>
