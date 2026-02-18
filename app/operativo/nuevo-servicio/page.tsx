@@ -3,11 +3,35 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import {
   Search, Car, Bike, CreditCard,
-  DollarSign, User, Hash, Plus, Printer, Check, Zap, UserPlus, ArrowRight
+  DollarSign, User, Hash, Plus, Printer, Check, Zap, UserPlus, XCircle
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { Bounce, ToastContainer, toast, ToastOptions, ToastPosition } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
 
-export const dynamic = 'force-dynamic'
+const Notification = ({ title, description, type }: { title: string, description: string, type: 'success' | 'error' | 'info' | 'warning' }) => (
+  <div className={`flex items-center p-4 rounded-xl shadow-lg border ${type === 'success' ? 'bg-green-50 border-green-200' :
+      type === 'error' ? 'bg-red-50 border-red-200' :
+        type === 'info' ? 'bg-blue-50 border-blue-200' :
+          'bg-yellow-50 border-yellow-200'
+    }`}>
+    <div className={`p-2 rounded-full mr-3 ${type === 'success' ? 'bg-green-500 text-white' :
+        type === 'error' ? 'bg-red-500 text-white' :
+          type === 'info' ? 'bg-blue-500 text-white' :
+            'bg-yellow-500 text-white'
+      }`}>
+      {type === 'success' ? <Check size={18} /> : type === 'error' ? <XCircle size={18} /> : <Zap size={18} />}
+    </div>
+    <div>
+      <p className={`font-black text-sm ${type === 'success' ? 'text-green-800' :
+          type === 'error' ? 'text-red-800' :
+            type === 'info' ? 'text-blue-800' :
+              'text-yellow-800'
+        }`}>{title}</p>
+      <p className="text-xs text-gray-600">{description}</p>
+    </div>
+  </div>
+);
 
 export default function NuevoServicioPage() {
   const supabase = createClient()
@@ -38,26 +62,33 @@ export default function NuevoServicioPage() {
     setEmpleados(emp || [])
   }
 
-  // FIX: Función de búsqueda que limpia estados anteriores
-  const buscarCliente = async () => {
-    if (!busquedaCedula) return
-    
-    // 1. Limpiamos rastro de búsquedas anteriores inmediatamente
-    setCliente(null)
-    setNombreNuevoCliente('')
-    setTelNuevoCliente('')
+  const toastOptions: ToastOptions = {
+    position: "top-center" as ToastPosition,
+    autoClose: 3000,
+    hideProgressBar: false,
+    closeOnClick: true,
+    pauseOnHover: true,
+    draggable: true,
+    theme: "light",
+    transition: Bounce,
+  };
 
-    const { data } = await supabase.from('clientes').select('*').eq('cedula', busquedaCedula).maybeSingle()
-    
-    if (data) {
-      // Si existe, cargamos sus datos
-      setCliente(data)
-      setNombreNuevoCliente(data.nombre)
-      setTelNuevoCliente(data.telefono)
-    } else {
-      // Si no existe, habilitamos para registro nuevo con campos vacíos
-      setCliente({ nuevo: true })
+  const buscarCliente = async () => {
+    if (!busquedaCedula) {
+      toast.warn(<Notification title="Atención" description="Ingresa una cédula." type="warning" />, toastOptions);
+      return;
     }
+    setCliente(null); setNombreNuevoCliente(''); setTelNuevoCliente(''); setLoading(true);
+    try {
+      const { data } = await supabase.from('clientes').select('*').eq('cedula', busquedaCedula).maybeSingle()
+      if (data) {
+        setCliente(data); setNombreNuevoCliente(data.nombre); setTelNuevoCliente(data.telefono);
+        toast.success(<Notification title="Éxito" description="Cliente encontrado." type="success" />, toastOptions);
+      } else {
+        setCliente({ nuevo: true });
+        toast.info(<Notification title="Nuevo" description="Cliente no registrado." type="info" />, toastOptions);
+      }
+    } finally { setLoading(false) }
   }
 
   const toggleServicio = (srv: any) => {
@@ -69,46 +100,52 @@ export default function NuevoServicioPage() {
 
   const imprimirRecibo = (datos: any) => {
     const nombreEmpleado = empleados.find(e => e.id === empleadoAsignado)?.nombre || 'General'
-    // Asegúrate de tener un archivo logo.png en /public
-    const logoUrl = window.location.origin + '/logo.png'; 
+    const logoUrl = window.location.origin + '/logo.png';
+    const nCli = cliente?.nombre || nombreNuevoCliente || 'Cliente General';
+    const cCli = cliente?.cedula || busquedaCedula || 'N/A';
 
     const ticketHTML = `
       <html>
         <head>
           <style>
+            @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
             @page { size: 80mm auto; margin: 0; }
-            body { font-family: 'Courier New', monospace; width: 70mm; padding: 5mm; color: black; }
+            body { font-family: 'Inter', sans-serif; width: 74mm; padding: 4mm; color: #000; font-size: 11px; line-height: 1.2; }
             .center { text-align: center; }
-            .bold { font-weight: bold; }
-            .logo { width: 45mm; margin-bottom: 5px; filter: grayscale(1); }
-            .header { border-bottom: 1px dashed black; padding-bottom: 10px; margin-bottom: 10px; }
-            .item { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 2px; }
-            .total { text-align: right; font-size: 18px; font-weight: bold; margin-top: 10px; border-top: 1px solid black; }
+            .bold { font-weight: 700; }
+            .logo { max-width: 45mm; margin: 0 auto 5px; display: block; filter: grayscale(1); }
+            .divider { border-top: 1px dashed #000; margin: 8px 0; }
+            .plate { font-size: 26px; font-weight: 900; border: 2px solid #000; padding: 4px; margin: 10px 0; display: block; text-align: center; }
+            .item { display: flex; justify-content: space-between; margin-bottom: 3px; }
+            .total { font-size: 20px; font-weight: 900; margin-top: 10px; display: flex; justify-content: space-between; }
           </style>
         </head>
         <body>
           <div class="center">
             <img src="${logoUrl}" class="logo" onerror="this.style.display='none'"/>
+            <div class="bold" style="font-size: 18px;">ECOPLANET KONG</div>
+            <div>LAVADO PROFESIONAL</div>
           </div>
-          <div class="center header">
-            <div class="bold" style="font-size: 20px;">ECOPLANET KONG</div>
-            <div style="font-size: 10px;">LAVADO PROFESIONAL</div>
-          </div>
-          <div style="font-size: 12px;">
-            <div>FECHA: ${new Date().toLocaleString()}</div>
-            <div class="bold" style="font-size: 22px; margin: 10px 0;">PLACA: ${datos.placa}</div>
-            <div>VEHICULO: ${datos.tipo_vehiculo.toUpperCase()}</div>
-            <div>ATIENDE: ${nombreEmpleado}</div>
-          </div>
-          <div style="border-top: 1px dashed black; margin: 10px 0;"></div>
+          <div class="divider"></div>
+          <div class="plate">${datos.placa}</div>
+          <div><b>FECHA:</b> ${new Date().toLocaleString()}</div>
+          <div><b>VEHICULO:</b> ${datos.tipo_vehiculo.toUpperCase()}</div>
+          <div><b>ATIENDE:</b> ${nombreEmpleado}</div>
+          <div><b>CLIENTE:</b> ${cCli} - ${nCli.toUpperCase()}</div>
+          <div class="divider"></div>
+          <div class="bold" style="margin-bottom: 5px;">SERVICIOS:</div>
           ${serviciosSeleccionados.map(s => `
             <div class="item">
               <span>${s.nombre.toUpperCase()}</span>
               <span>$${(tipoVehiculo === 'carro' ? s.precio_carro : s.precio_moto).toLocaleString()}</span>
             </div>
           `).join('')}
-          <div class="total">TOTAL: $${totalOrden.toLocaleString()}</div>
-          <div class="center" style="margin-top: 20px; font-size: 10px;">¡GRACIAS POR SU PREFERENCIA!</div>
+          <div class="divider"></div>
+          <div class="total">
+            <span>TOTAL:</span>
+            <span>$${totalOrden.toLocaleString()}</span>
+          </div>
+          <div class="center" style="margin-top: 15px;">¡GRACIAS POR TU PREFERENCIA!</div>
         </body>
       </html>
     `
@@ -118,207 +155,147 @@ export default function NuevoServicioPage() {
     const doc = iframe.contentWindow?.document;
     if (doc) {
       doc.open(); doc.write(ticketHTML); doc.close();
-      iframe.contentWindow?.focus();
-      setTimeout(() => { iframe.contentWindow?.print(); document.body.removeChild(iframe); }, 500);
+      setTimeout(() => { iframe.contentWindow?.focus(); iframe.contentWindow?.print(); document.body.removeChild(iframe); }, 500);
     }
   }
 
   const crearOrden = async () => {
     if (!placa || serviciosSeleccionados.length === 0 || !empleadoAsignado || !busquedaCedula) {
-      alert("Por favor completa los campos obligatorios"); return;
+      toast.error(<Notification title="Error" description="Completa todos los campos." type="error" />, toastOptions); return;
     }
     setLoading(true)
     try {
-      let finalClienteId = null
-      const { data: clienteEx } = await supabase.from('clientes').select('id').eq('cedula', busquedaCedula).maybeSingle()
-      if (clienteEx) { finalClienteId = clienteEx.id } 
+      let fId = null
+      const { data: ex } = await supabase.from('clientes').select('id').eq('cedula', busquedaCedula).maybeSingle()
+      if (ex) { fId = ex.id }
       else {
-        const { data: nuevoCl } = await supabase.from('clientes').insert([{ cedula: busquedaCedula, nombre: nombreNuevoCliente || 'Cliente Nuevo', telefono: telNuevoCliente || '' }]).select().single()
-        finalClienteId = nuevoCl?.id
+        const { data: n } = await supabase.from('clientes').insert([{ cedula: busquedaCedula, nombre: nombreNuevoCliente || 'Cliente Nuevo', telefono: telNuevoCliente || '' }]).select().single()
+        fId = n?.id
       }
-      const { data: orden, error } = await supabase.from('ordenes_servicio').insert([{
-        cliente_id: finalClienteId, placa: placa.toUpperCase(), tipo_vehiculo: tipoVehiculo,
+      const { data: ord, error } = await supabase.from('ordenes_servicio').insert([{
+        cliente_id: fId, placa: placa.toUpperCase(), tipo_vehiculo: tipoVehiculo,
         servicios_ids: serviciosSeleccionados.map(s => s.id), nombres_servicios: serviciosSeleccionados.map(s => s.nombre).join(', '),
         total: totalOrden, metodo_pago: metodoPago, empleado_id: empleadoAsignado, estado: 'pendiente'
       }]).select().single()
 
-      if (!error && orden) { imprimirRecibo(orden); setOrdenFinalizada(true); }
+      if (!error && ord) { imprimirRecibo(ord); setOrdenFinalizada(true); }
     } catch (e) { console.error(e) } finally { setLoading(false) }
   }
 
   return (
-    <div className="min-h-screen bg-[#F1F5F9] text-slate-900 p-4 md:p-8 pb-80 md:pb-72">
+    <div className="min-h-screen bg-[#F1F5F9] text-slate-900 p-4 md:p-8 pb-80 md:pb-72 relative">
+      <ToastContainer />
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="max-w-7xl mx-auto">
-        
-        {/* HEADER */}
+
         <header className="mb-6 md:mb-10 flex items-end gap-4">
-            <div className="bg-gorilla-orange w-1.5 md:w-2 h-10 md:h-12 rounded-full" />
-            <div>
-                <p className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] leading-none mb-1 md:mb-2">Operaciones</p>
-                <h1 className="text-3xl md:text-5xl font-black tracking-tighter uppercase italic leading-none">Nuevo <span className="text-gorilla-orange">Servicio</span></h1>
-            </div>
+          <div className="bg-gorilla-orange w-1.5 md:w-2 h-10 md:h-12 rounded-full" />
+          <div>
+            <p className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-[0.4em] mb-1">Operaciones</p>
+            <h1 className="text-3xl md:text-5xl font-black tracking-tighter uppercase italic">Nuevo <span className="text-gorilla-orange">Servicio</span></h1>
+          </div>
         </header>
 
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8 items-start">
-          
           <div className="lg:col-span-7 space-y-6 md:space-y-8">
-            {/* CARD VEHICULO */}
-            <div className="bg-white rounded-3xl md:rounded-[2.5rem] p-5 md:p-8 shadow-xl shadow-slate-200 border border-white">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6 md:mb-8">
-                    <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                        <Hash size={14} className="text-gorilla-orange" /> 1. Datos del Vehículo
-                    </h2>
-                    <div className="flex gap-2 w-full sm:w-auto">
-                        <button onClick={() => setTipoVehiculo('carro')} className={`flex-1 sm:flex-none px-4 md:px-6 py-2.5 md:py-3 rounded-xl md:rounded-2xl font-black text-[9px] md:text-[10px] transition-all flex items-center justify-center gap-2 border-2 ${tipoVehiculo === 'carro' ? 'bg-orange-50 border-gorilla-orange text-gorilla-orange' : 'bg-slate-50 border-transparent text-slate-400'}`}>
-                            <Car size={16}/> CARRO
-                        </button>
-                        <button onClick={() => setTipoVehiculo('moto')} className={`flex-1 sm:flex-none px-4 md:px-6 py-2.5 md:py-3 rounded-xl md:rounded-2xl font-black text-[9px] md:text-[10px] transition-all flex items-center justify-center gap-2 border-2 ${tipoVehiculo === 'moto' ? 'bg-orange-50 border-gorilla-orange text-gorilla-orange' : 'bg-slate-50 border-transparent text-slate-400'}`}>
-                            <Bike size={16}/> MOTO
-                        </button>
-                    </div>
+            <div className="bg-white rounded-[2rem] p-5 md:p-8 shadow-xl border border-white">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest flex items-center gap-2"><Hash size={14} className="text-gorilla-orange" /> 1. Vehículo</h2>
+                <div className="flex gap-2">
+                  <button onClick={() => setTipoVehiculo('carro')} className={`px-4 py-2 rounded-xl font-black text-[10px] transition-all border-2 ${tipoVehiculo === 'carro' ? 'bg-orange-50 border-gorilla-orange text-gorilla-orange' : 'bg-slate-50 border-transparent text-slate-400'}`}><Car size={16} /></button>
+                  <button onClick={() => setTipoVehiculo('moto')} className={`px-4 py-2 rounded-xl font-black text-[10px] transition-all border-2 ${tipoVehiculo === 'moto' ? 'bg-orange-50 border-gorilla-orange text-gorilla-orange' : 'bg-slate-50 border-transparent text-slate-400'}`}><Bike size={16} /></button>
                 </div>
-
-                <div className="relative group bg-slate-900 rounded-2xl md:rounded-[2rem] p-6 md:p-8 border-4 border-slate-800 shadow-inner overflow-hidden">
-                    <div className="absolute left-0 top-0 bottom-0 w-1.5 md:w-2 bg-gorilla-orange/20" />
-                    <input 
-                        placeholder="PLACA"
-                        className="w-full bg-transparent border-none text-5xl md:text-8xl font-black text-center uppercase tracking-tighter text-gorilla-orange outline-none placeholder:text-slate-800"
-                        value={placa} onChange={e => setPlaca(e.target.value)}
-                    />
-                </div>
+              </div>
+              <div className="bg-slate-900 rounded-[1.5rem] p-6 border-4 border-slate-800">
+                <input placeholder="PLACA" className="w-full bg-transparent border-none text-5xl md:text-7xl font-black text-center uppercase text-gorilla-orange outline-none placeholder:text-slate-800" value={placa} onChange={e => setPlaca(e.target.value)} />
+              </div>
             </div>
 
-            {/* CARD SERVICIOS */}
-            <div className="bg-white rounded-3xl md:rounded-[2.5rem] p-5 md:p-8 shadow-xl shadow-slate-200 border border-white">
-                <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">2. Selección de Servicios</h2>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 max-h-[50vh] md:max-h-[450px] overflow-y-auto pr-1 md:pr-2 custom-scrollbar">
-                    {serviciosDB.filter(s => s.aplica_a === tipoVehiculo || s.aplica_a === 'ambos').map(srv => {
-                        const sel = serviciosSeleccionados.find(s => s.id === srv.id)
-                        return (
-                            <button key={srv.id} onClick={() => toggleServicio(srv)} 
-                                className={`flex justify-between items-center p-4 md:p-6 rounded-2xl md:rounded-[2rem] border-2 transition-all group ${sel ? 'bg-purple-50 border-gorilla-purple shadow-lg shadow-purple-100' : 'bg-slate-50 border-transparent hover:bg-slate-100'}`}>
-                                <div className="flex items-center gap-3 md:gap-4 text-left">
-                                    <div className={`p-2 md:p-3 rounded-lg md:xl transition-all ${sel ? 'bg-gorilla-purple text-white scale-110 shadow-md' : 'bg-white text-slate-300'}`}>
-                                        {sel ? <Check size={16} strokeWidth={4}/> : <Plus size={16}/>}
-                                    </div>
-                                    <span className={`font-black text-[10px] md:text-xs uppercase italic leading-tight ${sel ? 'text-gorilla-purple' : 'text-slate-600'}`}>{srv.nombre}</span>
-                                </div>
-                                <span className={`font-black text-xs md:text-sm whitespace-nowrap ml-2 ${sel ? 'text-slate-900' : 'text-slate-400'}`}>${(tipoVehiculo === 'carro' ? srv.precio_carro : srv.precio_moto).toLocaleString()}</span>
-                            </button>
-                        )
-                    })}
-                </div>
+            <div className="bg-white rounded-[2rem] p-5 md:p-8 shadow-xl border border-white">
+              <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">2. Servicios</h2>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-[400px] overflow-y-auto pr-2 custom-scrollbar">
+                {serviciosDB.filter(s => s.aplica_a === tipoVehiculo || s.aplica_a === 'ambos').map(srv => {
+                  const sel = serviciosSeleccionados.find(s => s.id === srv.id)
+                  return (
+                    <button key={srv.id} onClick={() => toggleServicio(srv)} className={`flex justify-between items-center p-4 rounded-2xl border-2 transition-all ${sel ? 'bg-green-50 border-green-500' : 'bg-slate-50 border-transparent hover:bg-slate-100'}`}>
+                      <div className="flex items-center gap-3">
+                        <div className={`p-2 rounded-lg ${sel ? 'bg-green-500 text-white' : 'bg-white text-slate-300'}`}>{sel ? <Check size={14} /> : <Plus size={14} />}</div>
+                        <span className={`font-black text-[10px] uppercase italic ${sel ? 'text-green-800' : 'text-slate-600'}`}>{srv.nombre}</span>
+                      </div>
+                      <span className="font-black text-xs">${(tipoVehiculo === 'carro' ? srv.precio_carro : srv.precio_moto).toLocaleString()}</span>
+                    </button>
+                  )
+                })}
+              </div>
             </div>
           </div>
 
           <div className="lg:col-span-5 space-y-6 md:space-y-8">
-            {/* CARD IDENTIFICACIÓN (ARREGLADA) */}
-            <div className="bg-white rounded-3xl md:rounded-[2.5rem] p-5 md:p-8 shadow-xl shadow-slate-200 border border-white">
-                <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6 flex items-center gap-2">
-                    <User size={14} className="text-gorilla-purple" /> 3. Identificación
-                </h2>
-                <div className="flex gap-2 md:gap-3 mb-6 relative">
-                    <input 
-                        placeholder="Número de Cédula" 
-                        className="w-full bg-white border-2 border-gorilla-purple/30 p-4 md:p-5 rounded-2xl md:rounded-[1.5rem] outline-none focus:border-gorilla-purple transition-all font-bold text-slate-600 placeholder:text-slate-400"
-                        value={busquedaCedula} 
-                        onChange={e => setBusquedaCedula(e.target.value)} 
-                    />
-                    <button 
-                        onClick={buscarCliente} 
-                        className="bg-gorilla-purple text-white p-4 md:p-5 rounded-2xl md:rounded-3xl shadow-lg shadow-purple-200 hover:scale-105 active:scale-95 transition-all"
-                    >
-                        <Search size={22}/>
-                    </button>
-                </div>
-                <AnimatePresence mode="wait">
-                    {cliente && (
-                        <motion.div 
-                            key={cliente.id || 'nuevo'}
-                            initial={{opacity:0, y:10}} 
-                            animate={{opacity:1, y:0}} 
-                            exit={{opacity:0, y:-10}}
-                            className="space-y-4 p-5 md:p-6 bg-slate-50 rounded-2xl md:rounded-[2rem] border border-slate-100"
-                        >
-                            <div className="space-y-1">
-                                <label className="text-[9px] font-black text-slate-400 ml-2 uppercase">Nombre Completo</label>
-                                <input 
-                                    className="w-full bg-white border border-slate-200 p-3 md:p-4 rounded-xl outline-none font-black uppercase text-xs focus:border-gorilla-purple"
-                                    value={nombreNuevoCliente} 
-                                    onChange={e => setNombreNuevoCliente(e.target.value)} 
-                                />
-                            </div>
-                            <div className="space-y-1">
-                                <label className="text-[9px] font-black text-slate-400 ml-2 uppercase">Teléfono</label>
-                                <input 
-                                    className="w-full bg-white border border-slate-200 p-3 md:p-4 rounded-xl outline-none font-black text-xs focus:border-gorilla-purple"
-                                    value={telNuevoCliente} 
-                                    onChange={e => setTelNuevoCliente(e.target.value)} 
-                                />
-                            </div>
-                        </motion.div>
-                    )}
-                </AnimatePresence>
+            <div className="bg-white rounded-[2rem] p-5 md:p-8 shadow-xl border border-white">
+              <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6"><User size={14} className="text-gorilla-purple" /> 3. Cliente</h2>
+              <div className="flex gap-2 mb-4">
+                <input placeholder="Cédula" className="w-full bg-white border-2 border-slate-100 p-4 rounded-xl outline-none focus:border-gorilla-purple font-bold text-slate-600" value={busquedaCedula} onChange={e => setBusquedaCedula(e.target.value)} />
+                <button onClick={buscarCliente} className="bg-gorilla-purple text-white p-4 rounded-xl shadow-lg hover:scale-105 transition-all"><Search size={20} /></button>
+              </div>
+              <AnimatePresence mode="wait">
+                {cliente && (
+                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-3 p-4 bg-slate-50 rounded-xl border border-slate-100">
+                    <input placeholder="Nombre" className="w-full bg-white border border-slate-200 p-3 rounded-lg outline-none font-black uppercase text-xs focus:border-gorilla-purple" value={nombreNuevoCliente} onChange={e => setNombreNuevoCliente(e.target.value)} />
+                    <input placeholder="Teléfono" className="w-full bg-white border border-slate-200 p-3 rounded-lg outline-none font-black text-xs focus:border-gorilla-purple" value={telNuevoCliente} onChange={e => setTelNuevoCliente(e.target.value)} />
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
 
-            {/* CARD PAGO */}
-            <div className="bg-white rounded-3xl md:rounded-[2.5rem] p-5 md:p-8 shadow-xl shadow-slate-200 border border-white">
-                <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">4. Asignación & Cobro</h2>
-                <select className="w-full bg-slate-50 border-2 border-slate-100 p-4 md:p-5 rounded-xl md:rounded-2xl font-bold mb-4 md:mb-6 outline-none focus:border-gorilla-orange text-sm"
-                    value={empleadoAsignado} onChange={e => setEmpleadoAsignado(e.target.value)}>
-                    <option value="">Seleccionar Lavador...</option>
-                    {empleados.map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
-                </select>
-                <div className="flex gap-2 md:gap-4">
-                    <button onClick={() => setMetodoPago('efectivo')} className={`flex-1 py-4 md:py-5 rounded-xl md:rounded-[1.5rem] font-black text-[9px] md:text-[10px] tracking-widest transition-all border-2 ${metodoPago === 'efectivo' ? 'bg-green-50 border-green-500 text-green-600 shadow-lg shadow-green-100' : 'bg-slate-50 border-transparent text-slate-400'}`}>EFECTIVO</button>
-                    <button onClick={() => setMetodoPago('transferencia')} className={`flex-1 py-4 md:py-5 rounded-xl md:rounded-[1.5rem] font-black text-[9px] md:text-[10px] tracking-widest transition-all border-2 ${metodoPago === 'transferencia' ? 'bg-blue-50 border-blue-500 text-blue-600 shadow-lg shadow-blue-100' : 'bg-slate-50 border-transparent text-slate-400'}`}>TRANSF.</button>
-                </div>
+            <div className="bg-white rounded-[2rem] p-5 md:p-8 shadow-xl border border-white">
+              <h2 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-6">4. Pago</h2>
+              <select className="w-full bg-slate-50 border-2 border-slate-100 p-4 rounded-xl font-bold mb-4 outline-none focus:border-gorilla-orange text-sm appearance-none select-custom-arrow bg-right-1rem bg-no-repeat bg-origin-content" value={empleadoAsignado} onChange={e => setEmpleadoAsignado(e.target.value)}>
+                <option value="">Seleccionar Lavador...</option>
+                {empleados.map(e => <option key={e.id} value={e.id}>{e.nombre}</option>)}
+              </select>
+              <div className="flex gap-2">
+                <button onClick={() => setMetodoPago('efectivo')} className={`flex-1 py-4 rounded-xl font-black text-[10px] border-2 ${metodoPago === 'efectivo' ? 'bg-green-50 border-green-500 text-green-600' : 'bg-slate-50 border-transparent text-slate-400'}`}>EFECTIVO</button>
+                <button onClick={() => setMetodoPago('transferencia')} className={`flex-1 py-4 rounded-xl font-black text-[10px] border-2 ${metodoPago === 'transferencia' ? 'bg-blue-50 border-blue-500 text-blue-600' : 'bg-slate-50 border-transparent text-slate-400'}`}>TRANSF.</button>
+              </div>
             </div>
           </div>
         </div>
       </motion.div>
 
-      {/* FOOTER DOCK */}
       <div className="fixed bottom-0 left-0 right-0 p-4 md:p-8 z-50">
-        <div className="max-w-5xl mx-auto bg-white/90 backdrop-blur-2xl border border-white p-5 md:p-8 rounded-3xl md:rounded-[3.5rem] shadow-[0_-15px_40px_rgba(0,0,0,0.1)] flex flex-col md:flex-row justify-between items-center gap-4 md:gap-6 lg:ml-72">
-          <div className="flex items-center gap-4 md:gap-6 w-full md:w-auto justify-center md:justify-start">
-              <div className="bg-slate-900 p-3 md:p-4 rounded-2xl md:rounded-3xl text-white">
-                  <DollarSign size={20} className="text-gorilla-orange" />
-              </div>
-              <div>
-                  <p className="text-[9px] md:text-[10px] font-black text-slate-400 uppercase tracking-widest">Inversión Total</p>
-                  <p className="text-3xl md:text-5xl font-black text-slate-900 tracking-tighter leading-none">${totalOrden.toLocaleString()}</p>
-              </div>
+        <div className="max-w-5xl mx-auto bg-white/90 backdrop-blur-2xl border border-white p-5 md:p-8 rounded-[2.5rem] shadow-2xl flex flex-col md:flex-row justify-between items-center gap-4 lg:ml-72">
+          <div className="flex items-center gap-4">
+            <div className="bg-slate-900 p-3 rounded-2xl text-white"><DollarSign size={20} className="text-gorilla-orange" /></div>
+            <div>
+              <p className="text-[9px] font-black text-slate-400 uppercase">Total</p>
+              <p className="text-3xl md:text-5xl font-black text-slate-900 leading-none">${totalOrden.toLocaleString()}</p>
+            </div>
           </div>
-          <button 
-            onClick={crearOrden} 
-            disabled={loading}
-            className="w-full md:w-auto bg-gradient-to-br from-gorilla-orange to-orange-600 hover:from-orange-600 hover:to-orange-700 text-white px-8 md:px-12 py-4 md:py-6 rounded-2xl md:rounded-[2.5rem] font-black text-lg md:text-xl italic uppercase tracking-widest shadow-2xl shadow-orange-200 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3 md:gap-4"
-          >
-            {loading ? '...' : (
-                <> REGISTRAR <Printer size={20} /> </>
-            )}
+          <button onClick={crearOrden} disabled={loading} className="w-full md:w-auto bg-gorilla-orange text-white px-10 py-5 rounded-[2rem] font-black text-xl italic uppercase shadow-xl active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3">
+            {loading ? <div className="w-6 h-6 border-4 border-white border-t-transparent rounded-full animate-spin" /> : <> REGISTRAR <Printer size={20} /> </>}
           </button>
         </div>
       </div>
 
       <style jsx global>{`
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; border-radius: 10px; }
+        :root { --color-gorilla-orange: #FF6B00; --color-gorilla-purple: #8B5CF6; }
+        .bg-gorilla-orange { background-color: var(--color-gorilla-orange); }
+        .text-gorilla-orange { color: var(--color-gorilla-orange); }
+        .border-gorilla-orange { border-color: var(--color-gorilla-orange); }
+        .bg-gorilla-purple { background-color: var(--color-gorilla-purple); }
+        .focus\\:border-gorilla-purple:focus { border-color: var(--color-gorilla-purple); }
+        .select-custom-arrow { background-image: url('data:image/svg+xml;charset=UTF-8,%3csvg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor"%3e%3cpath fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd"/%3e%3c/svg%3e'); }
+        .bg-right-1rem { background-position: right 1rem center; }
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
         .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
       `}</style>
 
-      {/* MODAL ÉXITO */}
       <AnimatePresence>
         {ordenFinalizada && (
-          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-6 bg-slate-900/60 backdrop-blur-md">
-            <motion.div initial={{scale:0.9, opacity:0}} animate={{scale:1, opacity:1}} className="bg-white p-8 md:p-12 rounded-[2.5rem] md:rounded-[4rem] text-center max-w-sm w-full shadow-2xl border border-white">
-              <div className="w-20 h-20 md:w-24 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6 md:mb-8 shadow-xl shadow-green-200">
-                <Check size={40} className="text-white" strokeWidth={4} />
-              </div>
-              <h2 className="text-2xl md:text-3xl font-black text-slate-900 uppercase italic leading-tight mb-4">Registro<br/>Completado</h2>
-              <button onClick={() => window.location.reload()} className="w-full bg-slate-900 text-white font-black py-4 md:py-5 rounded-2xl md:rounded-3xl uppercase tracking-widest shadow-xl hover:bg-black transition-all">Nueva Orden</button>
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-md">
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} className="bg-white p-10 rounded-[3rem] text-center max-w-sm w-full shadow-2xl">
+              <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg shadow-green-100"><Check size={40} className="text-white" strokeWidth={4} /></div>
+              <h2 className="text-2xl font-black text-slate-900 uppercase italic mb-6">Registro<br />Exitoso</h2>
+              <button onClick={() => window.location.reload()} className="w-full bg-slate-900 text-white font-black py-4 rounded-2xl uppercase tracking-widest active:scale-95">Nueva Orden</button>
             </motion.div>
           </div>
         )}
