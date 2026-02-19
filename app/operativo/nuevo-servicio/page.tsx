@@ -83,6 +83,7 @@ export default function NuevoServicioPage() {
         </head>
         <body onload="window.print(); window.close();">
           <div class="center bold">ECOPLANET KONG</div>
+          <div class="center bold">310 337 5612</div>
           <div class="divider"></div>
           <div class="plate">${datos.placa}</div>
           <div><b>FECHA:</b> ${new Date().toLocaleString()}</div>
