@@ -2,8 +2,8 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import {
-  Search, Car, Bike, CreditCard, DollarSign, User, Hash, Plus, Printer, 
-  Check, Zap, UserPlus, X, Briefcase, ChevronRight, ShieldCheck
+  Search, Car, Bike, CreditCard, DollarSign, User, Hash, 
+  Plus, Check, Zap, UserPlus, Briefcase, ChevronRight, ShieldCheck, BadgeCheck, CheckCircle2
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Bounce, ToastContainer, toast, ToastOptions } from 'react-toastify';
@@ -77,57 +77,7 @@ export default function NuevoServicioPage() {
 
   const totalOrden = serviciosSeleccionados.reduce((acc, s) => acc + (tipoVehiculo === 'carro' ? s.precio_carro : s.precio_moto), 0)
 
-  // --- LÓGICA IMPRESIÓN ---
-  const imprimirRecibo = (datos: any) => {
-    const nombreEmpleado = empleados.find(e => e.id === empleadoAsignado)?.nombre || 'General'
-    const logoUrl = window.location.origin + '/logo.png';
-    const nCli = cliente?.nombre || nombreNuevoCliente || 'Cliente General';
-    const ticketHTML = `
-      <html>
-        <head>
-          <style>
-            @page { size: 80mm auto; margin: 0; }
-            body { font-family: 'Courier New', monospace; width: 72mm; padding: 5mm; color: #000; font-size: 11px; }
-            .center { text-align: center; }
-            .bold { font-weight: bold; }
-            .header { border-bottom: 1px dashed black; padding-bottom: 10px; margin-bottom: 10px; }
-            .plate { font-size: 24px; font-weight: 900; border: 2px solid black; padding: 5px; margin: 10px 0; text-align: center; display: block; }
-            .item { display: flex; justify-content: space-between; margin-bottom: 2px; }
-            .total { font-size: 18px; font-weight: 900; margin-top: 10px; text-align: right; border-top: 1px dashed black; padding-top: 5px; }
-          </style>
-        </head>
-        <body onload="window.print(); window.close();">
-          <div class="center header">
-            <div class="bold" style="font-size: 18px;">ECOPLANET KONG</div>
-            <div>LAVADO PROFESIONAL</div>
-          </div>
-          <div>FECHA: ${new Date().toLocaleString()}</div>
-          <div class="plate">${datos.placa}</div>
-          <div><b>CLIENTE:</b> ${nCli.toUpperCase()}</div>
-          <div><b>ATIENDE:</b> ${nombreEmpleado.toUpperCase()}</div>
-          <br/>
-          <div class="bold">SERVICIOS:</div>
-          ${serviciosSeleccionados.map(s => `
-            <div class="item">
-              <span>${s.nombre.toUpperCase()}</span>
-              <span>$${(tipoVehiculo === 'carro' ? s.precio_carro : s.precio_moto).toLocaleString()}</span>
-            </div>
-          `).join('')}
-          <div class="total">TOTAL: $${totalOrden.toLocaleString()}</div>
-          <div class="center" style="margin-top: 20px; font-size: 10px;">¡GRACIAS POR SU PREFERENCIA!</div>
-        </body>
-      </html>
-    `
-    const iframe = document.createElement('iframe');
-    iframe.style.display = 'none';
-    document.body.appendChild(iframe);
-    const doc = iframe.contentWindow?.document;
-    if (doc) {
-      doc.open(); doc.write(ticketHTML); doc.close();
-      setTimeout(() => { iframe.contentWindow?.focus(); iframe.contentWindow?.print(); document.body.removeChild(iframe); }, 500);
-    }
-  }
-
+  // --- FUNCIÓN CREAR ORDEN SIN IMPRESIÓN ---
   const crearOrden = async () => {
     if (!placa || serviciosSeleccionados.length === 0 || !empleadoAsignado || !busquedaCedula) {
       toast.error(<Notification title="ERROR" description="Faltan datos obligatorios" type="error" />, toastOptions); return;
@@ -147,7 +97,10 @@ export default function NuevoServicioPage() {
         total: totalOrden, metodo_pago: metodoPago, empleado_id: empleadoAsignado, estado: 'pendiente'
       }]).select().single()
 
-      if (!error && ord) { imprimirRecibo(ord); setOrdenFinalizada(true); }
+      if (!error && ord) { 
+        setOrdenFinalizada(true); // Solo mostramos el modal de éxito
+        toast.success(<Notification title="EXITO" description="Servicio registrado" type="success" />, toastOptions);
+      }
     } catch (e) { console.error(e) } finally { setLoading(false) }
   }
 
@@ -155,7 +108,7 @@ export default function NuevoServicioPage() {
     <div className="min-h-screen bg-[#F8FAFC] text-slate-900 font-sans flex flex-col lg:flex-row overflow-hidden">
       <ToastContainer />
       
-      {/* ---------------- IZQUIERDA: ZONA DE TRABAJO (SCROLLABLE) ---------------- */}
+      {/* ---------------- IZQUIERDA: ZONA DE TRABAJO ---------------- */}
       <div className="flex-1 h-full overflow-y-auto p-4 md:p-8 lg:p-12 pb-32 lg:pb-12">
         <header className="mb-10">
           <div className="flex items-center gap-3 mb-2">
@@ -247,10 +200,10 @@ export default function NuevoServicioPage() {
         </div>
       </div>
 
-      {/* ---------------- DERECHA: PANEL DE PAGO (FIJO EN PC, FLOTANTE EN MOVIL) ---------------- */}
+      {/* ---------------- DERECHA: PANEL DE PAGO ---------------- */}
       <div className="fixed bottom-0 left-0 right-0 lg:static lg:w-[450px] lg:h-screen lg:overflow-y-auto bg-[#0E0C15] text-white p-6 lg:p-10 shadow-[0_-10px_40px_rgba(0,0,0,0.2)] lg:shadow-none z-50 rounded-t-[2.5rem] lg:rounded-none flex flex-col justify-between transition-all duration-500">
         
-        {/* RESUMEN SUPERIOR (SOLO PC) */}
+        {/* RESUMEN SUPERIOR */}
         <div className="hidden lg:block space-y-8">
             <div className="flex items-center gap-3 opacity-50 mb-8">
                 <ShieldCheck size={16} />
@@ -272,9 +225,8 @@ export default function NuevoServicioPage() {
             </div>
         </div>
 
-        {/* ZONA DE PAGO (VISIBLE SIEMPRE) */}
+        {/* ZONA DE PAGO */}
         <div className="space-y-6 lg:space-y-8">
-            {/* EN MOVIL SE MUESTRA RESUMIDO */}
             <div className="lg:hidden flex justify-between items-center mb-4">
                 <div>
                     <p className="text-[10px] text-gray-400 font-black uppercase tracking-widest mb-1">Total a Pagar</p>
@@ -301,7 +253,6 @@ export default function NuevoServicioPage() {
                 </div>
             </div>
             
-            {/* TOTAL GIGANTE SOLO EN PC */}
             <div className="hidden lg:block py-6 border-t border-white/10">
                 <div className="flex justify-between items-end mb-2">
                     <span className="text-sm font-black text-gray-400 uppercase tracking-widest">Total Final</span>
@@ -314,7 +265,7 @@ export default function NuevoServicioPage() {
                 disabled={loading}
                 className="w-full bg-gorilla-orange hover:bg-orange-600 text-white py-6 rounded-[2rem] font-black text-lg italic uppercase tracking-widest shadow-2xl shadow-orange-500/20 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3"
             >
-                {loading ? 'Procesando...' : <>REGISTRAR <Printer size={24}/></>}
+                {loading ? 'Procesando...' : <>REGISTRAR VENTA <CheckCircle2 size={24}/></>}
             </button>
         </div>
       </div>
@@ -327,7 +278,7 @@ export default function NuevoServicioPage() {
               <div className="w-24 h-24 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-8 shadow-xl shadow-green-200 animate-bounce">
                 <Check size={48} className="text-white" strokeWidth={4} />
               </div>
-              <h2 className="text-3xl font-black text-slate-900 uppercase italic leading-none mb-4">Registro<br/>Completado</h2>
+              <h2 className="text-3xl font-black text-slate-900 uppercase italic leading-none mb-4">Servicio<br/>Registrado</h2>
               <button onClick={() => window.location.reload()} className="w-full bg-slate-900 text-white font-black py-5 rounded-3xl uppercase tracking-[0.2em] shadow-xl hover:bg-black transition-all">Nueva Orden</button>
             </motion.div>
           </div>
