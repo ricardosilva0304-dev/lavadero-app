@@ -87,7 +87,7 @@ export default function MonitoreoPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 p-4 md:p-8 lg:p-10 relative overflow-x-hidden">
+    <div className="min-h-screen pt-16 lg:pt-0 bg-[#F8FAFC] text-slate-900 p-4 md:p-8 lg:p-10 relative overflow-x-hidden">
 
       <div className="max-w-7xl mx-auto space-y-8 lg:space-y-10">
 

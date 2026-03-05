@@ -48,7 +48,7 @@ export default function ReportesPage() {
   const totalMonto = dataFiltrada.reduce((acc, item) => acc + (Number(item.total || item.total_pagar || 0)), 0)
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] print:bg-white text-slate-900 p-4 md:p-10 pb-32">
+    <div className="min-h-screen pt-16 lg:pt-0 bg-[#F8FAFC] print:bg-white text-slate-900 p-4 md:p-10 pb-32">
       
       {/* ESTILOS DE IMPRESIÓN MEJORADOS */}
       <style jsx global>{`

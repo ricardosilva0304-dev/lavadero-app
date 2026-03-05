@@ -70,7 +70,7 @@ export default function ResumenPage() {
   const totalTransferencia = data.lavadero.transferencia + data.parqueadero.transferencia + data.inventario.transferencia
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 p-4 md:p-8 lg:p-10 pb-24 overflow-x-hidden">
+    <div className="min-h-screen pt-16 lg:pt-0 bg-[#F8FAFC] text-slate-900 p-4 md:p-8 lg:p-10 pb-24 overflow-x-hidden">
       <main className="max-w-7xl mx-auto space-y-8 lg:space-y-10">
 
         {/* HEADER CON SELECTOR */}

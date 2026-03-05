@@ -123,7 +123,7 @@ export default function NuevoServicioPage() {
 
   return (
     // Estructura principal corregida: left relative + right fixed para eliminar espacios en blanco
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 font-sans relative flex flex-col xl:block">
+    <div className="min-h-screen pt-16 lg:pt-0 bg-[#F8FAFC] text-slate-900 font-sans relative flex flex-col xl:block">
       <ToastContainer />
 
       {/* ---------------- IZQUIERDA: ZONA DE TRABAJO ---------------- */}
