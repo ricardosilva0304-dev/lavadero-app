@@ -2,9 +2,9 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
-import { 
-  Car, Bike, CheckCircle2, Clock, 
-  PlayCircle, Trophy, ListChecks, LogOut 
+import {
+  Car, Bike, CheckCircle2, Clock,
+  PlayCircle, Trophy, ListChecks, LogOut
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -23,24 +23,25 @@ export default function OperativoPage() {
     router.push('/login')
   }
 
-  // Función de carga mejorada con modo "silencioso"
   const fetchMisOrdenes = async (cedula: string, silent = false) => {
     if (!silent) setLoading(true)
-    
-    const hoy = new Date()
-    hoy.setHours(0,0,0,0)
+
+    // Obtenemos la fecha de hoy en formato YYYY-MM-DD
+    const hoy = new Date().toISOString().split('T')[0];
 
     // 1. Obtener el ID del perfil del empleado
     const { data: perfil } = await supabase.from('perfiles').select('id').eq('cedula', cedula).single()
-    
+
     if (perfil) {
+      // 2. Consultar órdenes filtrando por el día completo (desde 00:00:00 a 23:59:59)
       const { data, error } = await supabase
         .from('ordenes_servicio')
         .select('*')
         .eq('empleado_id', perfil.id)
-        .gte('creado_en', hoy.toISOString())
+        .gte('creado_en', `${hoy}T00:00:00`)
+        .lte('creado_en', `${hoy}T23:59:59`)
         .order('creado_en', { ascending: false })
-      
+
       if (!error) setOrdenes(data || [])
     }
     setLoading(false)
@@ -60,8 +61,8 @@ export default function OperativoPage() {
     // SUSCRIPCIÓN EN TIEMPO REAL OPTIMIZADA
     const channel = supabase.channel('cambios_operativos')
       .on(
-        'postgres_changes', 
-        { event: '*', schema: 'public', table: 'ordenes_servicio' }, 
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'ordenes_servicio' },
         (payload) => {
           console.log('Cambio detectado en tiempo real:', payload)
           // Llamamos a la carga en modo silencioso para que el usuario no vea el spinner
@@ -83,7 +84,7 @@ export default function OperativoPage() {
       .from('ordenes_servicio')
       .update({ estado: nuevoEstado })
       .eq('id', id)
-    
+
     if (error) {
       console.error("Error al actualizar:", error)
       // Si falla, recargar datos originales
@@ -101,33 +102,33 @@ export default function OperativoPage() {
         <div className="flex justify-between items-center max-w-xl mx-auto">
           <div className="flex items-center gap-3">
             <div className="bg-gorilla-orange p-2 rounded-lg">
-                <img src="/logo.png" alt="Logo" className="w-8 h-8 invert" />
+              <img src="/logo.png" alt="Logo" className="w-8 h-8 invert" />
             </div>
             <div>
-                <h1 className="text-sm font-black italic leading-none text-white">ECOPLANET</h1>
-                <p className="text-[9px] text-gorilla-orange font-bold uppercase tracking-widest">KONG OPERATIVO</p>
+              <h1 className="text-sm font-black italic leading-none text-white">ECOPLANET</h1>
+              <p className="text-[9px] text-gorilla-orange font-bold uppercase tracking-widest">KONG OPERATIVO</p>
             </div>
           </div>
 
           <div className="flex items-center gap-4">
             <div className="text-right">
-                <p className="text-[10px] font-black leading-none uppercase">{user?.nombre?.split(' ')[0]}</p>
-                <p className="text-[8px] text-green-500 font-bold uppercase tracking-tighter">En Turno</p>
+              <p className="text-[10px] font-black leading-none uppercase">{user?.nombre?.split(' ')[0]}</p>
+              <p className="text-[8px] text-green-500 font-bold uppercase tracking-tighter">En Turno</p>
             </div>
             <button onClick={handleLogout} className="p-2 bg-white/5 rounded-full text-gray-400">
-                <LogOut size={20} />
+              <LogOut size={20} />
             </button>
           </div>
         </div>
 
         <div className="flex mt-6 bg-white/5 p-1 rounded-2xl max-w-xl mx-auto border border-white/5">
-          <button 
+          <button
             onClick={() => setActiveTab('tareas')}
             className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-xs transition-all ${activeTab === 'tareas' ? 'bg-gorilla-orange text-white shadow-lg' : 'text-gray-500'}`}
           >
             <ListChecks size={16} /> TAREAS ({pendientes.length})
           </button>
-          <button 
+          <button
             onClick={() => setActiveTab('resumen')}
             className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl font-bold text-xs transition-all ${activeTab === 'resumen' ? 'bg-gorilla-orange text-white shadow-lg' : 'text-gray-500'}`}
           >
@@ -138,14 +139,14 @@ export default function OperativoPage() {
 
       <main className="p-4 max-w-xl mx-auto mt-4">
         {loading ? (
-           <div className="text-center py-20">
-              <div className="w-10 h-10 border-4 border-gorilla-orange border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-gray-400 font-bold uppercase text-[10px] tracking-widest">Cargando...</p>
-           </div>
+          <div className="text-center py-20">
+            <div className="w-10 h-10 border-4 border-gorilla-orange border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+            <p className="text-gray-400 font-bold uppercase text-[10px] tracking-widest">Cargando...</p>
+          </div>
         ) : (
           <AnimatePresence mode="wait">
             {activeTab === 'tareas' ? (
-              <motion.div key="tareas" initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} exit={{opacity:0}} className="space-y-4">
+              <motion.div key="tareas" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-4">
                 {pendientes.length === 0 ? (
                   <div className="text-center py-20 opacity-20 italic">Sin tareas pendientes</div>
                 ) : (
@@ -153,7 +154,7 @@ export default function OperativoPage() {
                     <div key={o.id} className="bg-white border border-gray-200 rounded-[2rem] p-6 shadow-xl">
                       <div className="flex justify-between items-start mb-4">
                         <div className={`p-3 rounded-2xl ${o.tipo_vehiculo === 'carro' ? 'bg-blue-50 text-blue-600' : 'bg-orange-50 text-orange-600'}`}>
-                          {o.tipo_vehiculo === 'carro' ? <Car size={24}/> : <Bike size={24}/>}
+                          {o.tipo_vehiculo === 'carro' ? <Car size={24} /> : <Bike size={24} />}
                         </div>
                         <div className="text-right">
                           <p className="text-3xl font-black tracking-tighter uppercase">{o.placa}</p>
@@ -180,7 +181,7 @@ export default function OperativoPage() {
                 )}
               </motion.div>
             ) : (
-              <motion.div key="resumen" initial={{opacity:0, y:10}} animate={{opacity:1, y:0}} exit={{opacity:0}} className="space-y-4">
+              <motion.div key="resumen" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} className="space-y-4">
                 <div className="bg-[#0E0C15] text-white rounded-[2.5rem] p-8 shadow-2xl">
                   <p className="text-[10px] font-black text-gorilla-orange uppercase tracking-[0.3em] mb-2 text-center">Producción de Hoy</p>
                   <p className="text-5xl font-black italic tracking-tighter text-center">${totalDinero.toLocaleString()}</p>
