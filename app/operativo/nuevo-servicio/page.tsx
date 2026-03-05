@@ -30,6 +30,7 @@ export default function NuevoServicioPage() {
   const [serviciosDB, setServiciosDB] = useState<any[]>([])
   const [empleados, setEmpleados] = useState<any[]>([])
   const [ordenFinalizada, setOrdenFinalizada] = useState(false)
+  const [fechaServicio, setFechaServicio] = useState(new Date().toISOString().split('T')[0])
 
   const [tipoVehiculo, setTipoVehiculo] = useState<'carro' | 'moto'>('carro')
   const [serviciosSeleccionados, setServiciosSeleccionados] = useState<any[]>([])
@@ -89,33 +90,33 @@ export default function NuevoServicioPage() {
       if (ex) {
         fId = ex.id
       } else {
-        // CORRECCIÓN AQUÍ: Agregamos la cédula usando el mismo teléfono para que Supabase no arroje error 400
         const { data: n, error: errCliente } = await supabase.from('clientes').insert([{
           telefono: busquedaTelefono,
-          cedula: busquedaTelefono, // <--- Esto soluciona el Bad Request
+          cedula: busquedaTelefono,
           nombre: nombreNuevoCliente || 'Cliente Nuevo'
         }]).select().single()
 
-        if (errCliente) {
-          console.error("Error BD Cliente:", errCliente)
-          toast.error(<Notification title="Error" description="Revisa la BD de clientes" type="error" />, toastOptions);
-          setLoading(false);
-          return;
-        }
+        if (errCliente) { setLoading(false); return; }
         fId = n?.id
       }
 
+      // AQUÍ ESTÁ EL CAMBIO: Se agrega 'creado_en' con la fecha seleccionada
       const { data: ord, error } = await supabase.from('ordenes_servicio').insert([{
-        cliente_id: fId, placa: placa.toUpperCase(), tipo_vehiculo: tipoVehiculo,
-        servicios_ids: serviciosSeleccionados.map(s => s.id), nombres_servicios: serviciosSeleccionados.map(s => s.nombre).join(', '),
-        total: totalOrden, metodo_pago: metodoPago, empleado_id: empleadoAsignado, estado: 'pendiente'
+        cliente_id: fId,
+        placa: placa.toUpperCase(),
+        tipo_vehiculo: tipoVehiculo,
+        servicios_ids: serviciosSeleccionados.map(s => s.id),
+        nombres_servicios: serviciosSeleccionados.map(s => s.nombre).join(', '),
+        total: totalOrden,
+        metodo_pago: metodoPago,
+        empleado_id: empleadoAsignado,
+        estado: 'pendiente',
+        creado_en: new Date(fechaServicio).toISOString() // <--- Se fuerza la fecha elegida
       }]).select().single()
 
       if (!error && ord) {
         setOrdenFinalizada(true);
         toast.success(<Notification title="ÉXITO" description="Servicio registrado" type="success" />, toastOptions);
-      } else if (error) {
-        console.error("Error BD Orden:", error)
       }
     } catch (e) { console.error(e) } finally { setLoading(false) }
   }
@@ -269,6 +270,16 @@ export default function NuevoServicioPage() {
                 </motion.div>
               )}
             </AnimatePresence>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-[10px] font-black text-gray-400 uppercase ml-2 tracking-widest">Fecha del Servicio</label>
+            <input
+              type="date"
+              className="w-full bg-white/5 border border-white/10 p-4 rounded-xl text-white font-bold text-sm outline-none focus:border-gorilla-orange transition-all"
+              value={fechaServicio}
+              onChange={(e) => setFechaServicio(e.target.value)}
+            />
           </div>
 
           {/* LAVADOR Y MÉTODO DE PAGO */}

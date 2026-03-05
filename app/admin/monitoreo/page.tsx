@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
-import { Activity, Clock, User, CheckCircle2, Zap, LayoutDashboard, ShieldCheck } from 'lucide-react'
+import { Activity, Clock, User, CheckCircle2, Zap, LayoutDashboard, ShieldCheck, PlayCircle } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 export const dynamic = 'force-dynamic'
@@ -13,22 +13,22 @@ export default function MonitoreoPage() {
 
   useEffect(() => {
     fetchStatus()
-    const channel = supabase.channel('monitoreo_admin').on('postgres_changes', { event: '*', schema: 'public', table: 'ordenes_servicio' }, () => fetchStatus()).subscribe()
+    // Suscripción en tiempo real: Si el lavador lo cambia en su celular, también se refleja aquí
+    const channel = supabase.channel('monitoreo_admin')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ordenes_servicio' }, () => fetchStatus())
+      .subscribe()
     return () => { supabase.removeChannel(channel) }
-  }, [])
+  },[])
 
   const fetchStatus = async () => {
     const hoy = new Date(); hoy.setHours(0, 0, 0, 0)
 
-    // 1. Obtener todos los empleados
     const { data: empleados } = await supabase.from('perfiles').select('*').eq('rol', 'empleado')
-
-    // 2. Obtener todas las ordenes de hoy
     const { data: ordenes } = await supabase.from('ordenes_servicio').select('*').gte('creado_en', hoy.toISOString())
 
     if (empleados) {
       const resumen = empleados.map(emp => {
-        const misOrdenes = ordenes?.filter(o => o.empleado_id === emp.id) || []
+        const misOrdenes = ordenes?.filter(o => o.empleado_id === emp.id) ||[]
         return {
           ...emp,
           completados: misOrdenes.filter(o => o.estado === 'terminado').length,
@@ -37,12 +37,44 @@ export default function MonitoreoPage() {
         }
       })
 
-      // Ordenar: Los que tienen tareas activas primero, luego por producción
       resumen.sort((a, b) => b.activos.length - a.activos.length || b.totalProducido - a.totalProducido)
-
       setEmpleadosData(resumen)
     }
     setLoading(false)
+  }
+
+  // NUEVA FUNCIÓN: Permite al Admin cambiar el estado
+  const actualizarEstado = async (id: string, nuevoEstado: string) => {
+    // 1. Actualización Optimista: Cambia la interfaz instantáneamente para que se sienta rápido
+    setEmpleadosData(prev => prev.map(emp => {
+      const tieneTarea = emp.activos.find((a: any) => a.id === id);
+      if (!tieneTarea) return emp;
+
+      if (nuevoEstado === 'terminado') {
+        const nuevosActivos = emp.activos.filter((a: any) => a.id !== id);
+        return {
+          ...emp,
+          activos: nuevosActivos,
+          completados: emp.completados + 1,
+          totalProducido: emp.totalProducido + Number(tieneTarea.total || 0)
+        };
+      } else {
+        const nuevosActivos = emp.activos.map((a: any) => a.id === id ? { ...a, estado: nuevoEstado } : a);
+        return { ...emp, activos: nuevosActivos };
+      }
+    }));
+
+    // 2. Ejecuta el cambio en Base de Datos en segundo plano
+    const { error } = await supabase
+      .from('ordenes_servicio')
+      .update({ estado: nuevoEstado })
+      .eq('id', id);
+
+    // Si hay un error, revertimos cargando la BD real de nuevo
+    if (error) {
+      console.error("Error al actualizar:", error);
+      fetchStatus(); 
+    }
   }
 
   return (
@@ -65,13 +97,13 @@ export default function MonitoreoPage() {
                 <ShieldCheck size={14} className="text-gorilla-purple" /> {empleadosData.length} Lavadores
               </span>
               <span className="flex items-center gap-1.5 text-[10px] font-black text-gorilla-orange tracking-widest uppercase bg-orange-50 px-4 py-2 rounded-xl border border-orange-100 shadow-sm">
-                <Zap size={14} fill="currentColor" /> Actividad en Tiempo Real
+                <Zap size={14} fill="currentColor" /> Control en Tiempo Real
               </span>
             </div>
           </motion.div>
         </header>
 
-        {/* CONTENIDO PRINCIPAL - GRID INTELIGENTE */}
+        {/* CONTENIDO PRINCIPAL */}
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-5 lg:gap-6">
           {loading ? (
             Array(6).fill(0).map((_, i) => (
@@ -109,7 +141,7 @@ export default function MonitoreoPage() {
                       </div>
                     )}
 
-                    {/* Encabezado: Avatar y Nombre */}
+                    {/* Encabezado */}
                     <div className="flex items-center gap-4 mb-6 pr-6">
                       <div className={`w-12 h-12 shrink-0 rounded-[1rem] flex items-center justify-center font-black text-xl text-white shadow-inner ${isWorking ? 'bg-gorilla-purple' : 'bg-slate-300'}`}>
                         {emp.nombre[0].toUpperCase()}
@@ -122,7 +154,7 @@ export default function MonitoreoPage() {
                       </div>
                     </div>
 
-                    {/* Métricas: Lavados Hoy y Producido */}
+                    {/* Métricas */}
                     <div className="grid grid-cols-2 gap-3 mb-6">
                       <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100 flex flex-col items-center justify-center text-center">
                         <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-1">Lavados Hoy</p>
@@ -148,14 +180,35 @@ export default function MonitoreoPage() {
                           </div>
                         ) : (
                           emp.activos.map((act: any) => (
-                            <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} key={act.id} className="bg-white border border-purple-100 p-3 rounded-xl flex items-center justify-between shadow-sm">
-                              <div className="flex items-center gap-2.5">
-                                <div className="bg-purple-50 p-1.5 rounded-lg text-gorilla-purple"><Clock size={14} /></div>
-                                <span className="text-xs font-black text-slate-800 uppercase tracking-tight">{act.placa}</span>
+                            <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} key={act.id} className="bg-white border border-slate-100 hover:border-purple-200 transition-colors p-2.5 rounded-xl flex items-center justify-between shadow-sm group">
+                              <div className="flex items-center gap-3">
+                                <div className={`p-1.5 rounded-lg ${act.estado === 'pendiente' ? 'bg-red-50 text-red-500' : 'bg-purple-50 text-gorilla-purple'}`}>
+                                  <Clock size={14} />
+                                </div>
+                                <div>
+                                    <span className="text-xs font-black text-slate-800 uppercase tracking-tight block leading-none mb-1">{act.placa}</span>
+                                    <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">{act.estado === 'pendiente' ? 'En Espera' : 'Lavando'}</span>
+                                </div>
                               </div>
-                              <span className={`text-[8px] font-black px-2 py-1 rounded-md uppercase tracking-widest ${act.estado === 'pendiente' ? 'bg-red-50 text-red-500 border border-red-100' : 'bg-purple-50 text-gorilla-purple border border-purple-100'}`}>
-                                {act.estado}
-                              </span>
+                              
+                              {/* BOTONES ADMINISTRATIVOS */}
+                              {act.estado === 'pendiente' ? (
+                                <button 
+                                  onClick={() => actualizarEstado(act.id, 'en_proceso')}
+                                  className="bg-slate-900 text-white p-2 rounded-lg hover:bg-black transition-all active:scale-95 shadow-md flex items-center justify-center shrink-0"
+                                  title="Iniciar Tarea"
+                                >
+                                  <PlayCircle size={16} className="text-gorilla-orange" />
+                                </button>
+                              ) : (
+                                <button 
+                                  onClick={() => actualizarEstado(act.id, 'terminado')}
+                                  className="bg-green-500 text-white p-2 rounded-lg hover:bg-green-600 transition-all active:scale-95 shadow-md shadow-green-200/50 flex items-center justify-center shrink-0"
+                                  title="Terminar Tarea"
+                                >
+                                  <CheckCircle2 size={16} />
+                                </button>
+                              )}
                             </motion.div>
                           ))
                         )}
