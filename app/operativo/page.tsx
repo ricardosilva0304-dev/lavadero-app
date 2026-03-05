@@ -56,16 +56,21 @@ export default function OperativoPage() {
 
     const parsedUser = JSON.parse(userData)
     setUser(parsedUser)
-    fetchMisOrdenes(parsedUser.cedula)
+    fetchMisOrdenes(parsedUser.cedula) // Asegúrate de llamar a esta función inicial
 
-    // SUSCRIPCIÓN EN TIEMPO REAL OPTIMIZADA
-    const channel = supabase.channel('cambios_operativos')
+    // SUSCRIPCIÓN EN TIEMPO REAL
+    const channel = supabase
+      .channel('cambios_operativos') // Nombre único del canal
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'ordenes_servicio' },
+        {
+          event: '*', // Escucha INSERT, UPDATE y DELETE
+          schema: 'public',
+          table: 'ordenes_servicio' // Asegúrate que este sea el nombre real de tu tabla en Supabase
+        },
         (payload) => {
-          console.log('Cambio detectado en tiempo real:', payload)
-          // Llamamos a la carga en modo silencioso para que el usuario no vea el spinner
+          console.log('Cambio detectado:', payload)
+          // Al detectar CUALQUIER cambio, volvemos a traer las órdenes del empleado actual
           fetchMisOrdenes(parsedUser.cedula, true)
         }
       )
@@ -74,7 +79,7 @@ export default function OperativoPage() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, []) // Solo se ejecuta al montar el componente
+  }, [])
 
   const actualizarEstado = async (id: string, nuevoEstado: string) => {
     // Actualización optimista: cambiar el estado localmente antes de la DB para que sea instantáneo
