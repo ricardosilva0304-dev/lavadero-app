@@ -78,7 +78,7 @@ export default function ParqueaderoPage() {
   }
 
   return (
-    <div className="min-h-screen pt-16 lg:pt-0 bg-[#F8FAFC] text-slate-900 p-4 md:p-8 lg:p-10 relative overflow-x-hidden">
+    <div className="min-h-screen pt-24 lg:pt-10 bg-[#F8FAFC] text-slate-900 px-6 py-6 md:p-10 lg:p-10 relative overflow-x-hidden">
 
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="max-w-7xl mx-auto">
 

@@ -54,7 +54,7 @@ export default function HistorialPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 p-4 md:p-8 lg:p-10 overflow-x-hidden">
+    <div className="min-h-screen pt-24 lg:pt-10 bg-[#F8FAFC] text-slate-900 px-6 py-6 md:p-10 lg:p-10 overflow-x-hidden">
 
       <div className="max-w-6xl mx-auto space-y-8 lg:space-y-10">
 

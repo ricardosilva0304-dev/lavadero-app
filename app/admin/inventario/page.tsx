@@ -97,7 +97,7 @@ export default function InventarioPage() {
   const productosFiltrados = productos.filter(p => p.nombre.toLowerCase().includes(busqueda.toLowerCase()))
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 p-4 md:p-8 lg:p-10 pb-32 overflow-x-hidden">
+    <div className="min-h-screen pt-24 lg:pt-10 bg-[#F8FAFC] text-slate-900 px-6 py-6 md:p-10 lg:p-10 pb-32 overflow-x-hidden">
 
       {/* HEADER Y TABS */}
       <header className="max-w-7xl mx-auto mb-10 flex flex-col md:flex-row justify-between items-start md:items-end gap-6">

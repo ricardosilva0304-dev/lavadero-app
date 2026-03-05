@@ -2,9 +2,7 @@
 import { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import {
-  Settings, Users, Car, Bike, Trash2, Plus,
-  ShieldCheck, Smartphone, DollarSign, Briefcase,
-  UserPlus, Layers, Save, X, Edit3, Clock, Check, Info
+  Settings, Users, Car, Bike, Trash2, Plus, Layers, Save, X, Edit3, Clock, Check, Info, UserPlus, DollarSign, Briefcase
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -94,7 +92,7 @@ export default function ConfiguracionPage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] text-slate-900 p-4 md:p-8 lg:p-10 pb-32">
+    <div className="min-h-screen pt-24 lg:pt-10 bg-[#F8FAFC] text-slate-900 px-6 py-6 md:p-10 lg:p-10 pb-32">
 
       <header className="max-w-7xl mx-auto mb-8 lg:mb-12">
         <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-4 md:gap-6">
@@ -103,11 +101,11 @@ export default function ConfiguracionPage() {
           </div>
           <div>
             <div className="flex items-center gap-2 mb-1">
-                <div className="h-1 w-8 bg-gorilla-orange rounded-full" />
-                <span className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-400">Control System</span>
+              <div className="h-1 w-8 bg-gorilla-orange rounded-full" />
+              <span className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-400">Control System</span>
             </div>
             <h1 className="text-3xl md:text-5xl font-black tracking-tighter uppercase italic text-slate-900 leading-none">
-                Central <span className="text-gorilla-orange">Core</span>
+              Central <span className="text-gorilla-orange">Core</span>
             </h1>
           </div>
         </motion.div>
@@ -138,7 +136,7 @@ export default function ConfiguracionPage() {
                 <div className="space-y-10">
                   <div className="bg-slate-50 p-6 md:p-10 rounded-[2rem] md:rounded-[3rem] border border-slate-100 shadow-inner">
                     <h2 className="text-lg md:text-xl font-black text-slate-800 mb-6 md:mb-8 italic uppercase tracking-tighter flex items-center gap-3">
-                        <Plus className="text-gorilla-orange" /> Nuevo Servicio
+                      <Plus className="text-gorilla-orange" /> Nuevo Servicio
                     </h2>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-8">
                       <FormInput label="Nombre" placeholder="Ej: Full Detail" value={formServicio.nombre} onChange={(e: any) => setFormServicio({ ...formServicio, nombre: e.target.value })} />
@@ -258,10 +256,10 @@ export default function ConfiguracionPage() {
                       onSave={(tipo: any, v: any) => actualizarTarifa('moto', v)}
                     />
                   </div>
-                  
+
                   <div className="p-6 bg-blue-50 rounded-[2rem] border border-blue-100 flex items-start gap-4">
-                     <Info className="text-blue-500 shrink-0 mt-1" size={20}/>
-                     <p className="text-xs font-bold text-blue-600 leading-relaxed uppercase italic">Nota: Los precios definidos aquí se aplicarán a los nuevos ingresos de vehículos.</p>
+                    <Info className="text-blue-500 shrink-0 mt-1" size={20} />
+                    <p className="text-xs font-bold text-blue-600 leading-relaxed uppercase italic">Nota: Los precios definidos aquí se aplicarán a los nuevos ingresos de vehículos.</p>
                   </div>
                 </div>
               )}
@@ -319,17 +317,17 @@ function TarifaCard({ tipo, icono, valores, onSave }: any) {
         <div className="p-3 bg-slate-900 text-white rounded-xl">{icono}</div>
         <h3 className="text-xl font-black italic uppercase text-slate-900 tracking-tighter">{tipo}</h3>
       </div>
-      
+
       <div className="grid grid-cols-1 gap-4">
-        <MiniInput label="Precio x Día" value={vals.dia} onChange={(v: any) => setVals({...vals, dia: v})} />
-        <MiniInput label="Precio x Mes" value={vals.mes} onChange={(v: any) => setVals({...vals, mes: v})} />
+        <MiniInput label="Precio x Día" value={vals.dia} onChange={(v: any) => setVals({ ...vals, dia: v })} />
+        <MiniInput label="Precio x Mes" value={vals.mes} onChange={(v: any) => setVals({ ...vals, mes: v })} />
       </div>
 
-      <button 
-        onClick={() => {onSave(tipo, vals); setSaved(true); setTimeout(() => setSaved(false), 2000)}}
+      <button
+        onClick={() => { onSave(tipo, vals); setSaved(true); setTimeout(() => setSaved(false), 2000) }}
         className={`w-full mt-6 p-4 rounded-xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 transition-all ${saved ? 'bg-green-500 text-white' : 'bg-slate-900 text-white shadow-lg'}`}
       >
-        {saved ? <><Check size={16}/> Guardado</> : <><Save size={16}/> Actualizar</>}
+        {saved ? <><Check size={16} /> Guardado</> : <><Save size={16} /> Actualizar</>}
       </button>
     </div>
   )
