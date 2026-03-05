@@ -18,17 +18,26 @@ export default function MonitoreoPage() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'ordenes_servicio' }, () => fetchStatus())
       .subscribe()
     return () => { supabase.removeChannel(channel) }
-  },[])
+  }, [])
 
   const fetchStatus = async () => {
-    const hoy = new Date(); hoy.setHours(0, 0, 0, 0)
+    // 1. Obtener fecha de hoy en formato YYYY-MM-DD
+    const hoy = new Date().toISOString().split('T')[0];
 
+    // 2. Obtener todos los empleados
     const { data: empleados } = await supabase.from('perfiles').select('*').eq('rol', 'empleado')
-    const { data: ordenes } = await supabase.from('ordenes_servicio').select('*').gte('creado_en', hoy.toISOString())
+
+    // 3. Consultar órdenes filtrando por texto (YYYY-MM-DD) en lugar de horas UTC
+    // Esto es mucho más seguro para evitar errores de zona horaria
+    const { data: ordenes } = await supabase
+      .from('ordenes_servicio')
+      .select('*')
+      .gte('creado_en', `${hoy}T00:00:00`)
+      .lte('creado_en', `${hoy}T23:59:59`)
 
     if (empleados) {
       const resumen = empleados.map(emp => {
-        const misOrdenes = ordenes?.filter(o => o.empleado_id === emp.id) ||[]
+        const misOrdenes = ordenes?.filter(o => o.empleado_id === emp.id) || []
         return {
           ...emp,
           completados: misOrdenes.filter(o => o.estado === 'terminado').length,
@@ -73,7 +82,7 @@ export default function MonitoreoPage() {
     // Si hay un error, revertimos cargando la BD real de nuevo
     if (error) {
       console.error("Error al actualizar:", error);
-      fetchStatus(); 
+      fetchStatus();
     }
   }
 
@@ -127,8 +136,8 @@ export default function MonitoreoPage() {
                     exit={{ opacity: 0, scale: 0.95 }}
                     key={emp.id}
                     className={`bg-white border p-6 rounded-[2rem] transition-all group relative flex flex-col justify-between ${isWorking
-                        ? 'border-purple-200 shadow-lg shadow-purple-100/50'
-                        : 'border-slate-200/60 shadow-sm hover:shadow-md hover:border-slate-300'
+                      ? 'border-purple-200 shadow-lg shadow-purple-100/50'
+                      : 'border-slate-200/60 shadow-sm hover:shadow-md hover:border-slate-300'
                       }`}
                   >
                     {/* Indicador de Actividad */}
@@ -186,14 +195,14 @@ export default function MonitoreoPage() {
                                   <Clock size={14} />
                                 </div>
                                 <div>
-                                    <span className="text-xs font-black text-slate-800 uppercase tracking-tight block leading-none mb-1">{act.placa}</span>
-                                    <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">{act.estado === 'pendiente' ? 'En Espera' : 'Lavando'}</span>
+                                  <span className="text-xs font-black text-slate-800 uppercase tracking-tight block leading-none mb-1">{act.placa}</span>
+                                  <span className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">{act.estado === 'pendiente' ? 'En Espera' : 'Lavando'}</span>
                                 </div>
                               </div>
-                              
+
                               {/* BOTONES ADMINISTRATIVOS */}
                               {act.estado === 'pendiente' ? (
-                                <button 
+                                <button
                                   onClick={() => actualizarEstado(act.id, 'en_proceso')}
                                   className="bg-slate-900 text-white p-2 rounded-lg hover:bg-black transition-all active:scale-95 shadow-md flex items-center justify-center shrink-0"
                                   title="Iniciar Tarea"
@@ -201,7 +210,7 @@ export default function MonitoreoPage() {
                                   <PlayCircle size={16} className="text-gorilla-orange" />
                                 </button>
                               ) : (
-                                <button 
+                                <button
                                   onClick={() => actualizarEstado(act.id, 'terminado')}
                                   className="bg-green-500 text-white p-2 rounded-lg hover:bg-green-600 transition-all active:scale-95 shadow-md shadow-green-200/50 flex items-center justify-center shrink-0"
                                   title="Terminar Tarea"
