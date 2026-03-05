@@ -85,14 +85,26 @@ export default function NuevoServicioPage() {
     try {
       let fId = null
       const { data: ex } = await supabase.from('clientes').select('id').eq('telefono', busquedaTelefono).maybeSingle()
-      if (ex) fId = ex.id
-      else {
-        const { data: n } = await supabase.from('clientes').insert([{
+
+      if (ex) {
+        fId = ex.id
+      } else {
+        // CORRECCIÓN AQUÍ: Agregamos la cédula usando el mismo teléfono para que Supabase no arroje error 400
+        const { data: n, error: errCliente } = await supabase.from('clientes').insert([{
           telefono: busquedaTelefono,
+          cedula: busquedaTelefono, // <--- Esto soluciona el Bad Request
           nombre: nombreNuevoCliente || 'Cliente Nuevo'
         }]).select().single()
+
+        if (errCliente) {
+          console.error("Error BD Cliente:", errCliente)
+          toast.error(<Notification title="Error" description="Revisa la BD de clientes" type="error" />, toastOptions);
+          setLoading(false);
+          return;
+        }
         fId = n?.id
       }
+
       const { data: ord, error } = await supabase.from('ordenes_servicio').insert([{
         cliente_id: fId, placa: placa.toUpperCase(), tipo_vehiculo: tipoVehiculo,
         servicios_ids: serviciosSeleccionados.map(s => s.id), nombres_servicios: serviciosSeleccionados.map(s => s.nombre).join(', '),
@@ -102,6 +114,8 @@ export default function NuevoServicioPage() {
       if (!error && ord) {
         setOrdenFinalizada(true);
         toast.success(<Notification title="ÉXITO" description="Servicio registrado" type="success" />, toastOptions);
+      } else if (error) {
+        console.error("Error BD Orden:", error)
       }
     } catch (e) { console.error(e) } finally { setLoading(false) }
   }
