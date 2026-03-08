@@ -30,7 +30,16 @@ export default function NuevoServicioPage() {
   const [serviciosDB, setServiciosDB] = useState<any[]>([])
   const [empleados, setEmpleados] = useState<any[]>([])
   const [ordenFinalizada, setOrdenFinalizada] = useState(false)
-  const [fechaServicio, setFechaServicio] = useState(new Date().toISOString().split('T')[0])
+  // Función para obtener la fecha local exacta (YYYY-MM-DD) sin saltos de zona horaria
+  const getFechaLocal = () => {
+    const hoy = new Date();
+    const year = hoy.getFullYear();
+    const month = String(hoy.getMonth() + 1).padStart(2, '0');
+    const day = String(hoy.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const [fechaServicio, setFechaServicio] = useState(getFechaLocal());
 
   const [tipoVehiculo, setTipoVehiculo] = useState<'carro' | 'moto'>('carro')
   const [serviciosSeleccionados, setServiciosSeleccionados] = useState<any[]>([])
