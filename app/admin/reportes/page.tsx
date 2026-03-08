@@ -116,7 +116,7 @@ export default function ReportesPage() {
                     </div>
                 </header>
 
-                {/* BUSCADOR Y BOTÓN IMPRIMIR */}
+                {/* BUSCADOR */}
                 <div className="flex flex-col sm:flex-row gap-3 no-print">
                     <div className="relative flex-1 group">
                         <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-gorilla-purple transition-colors" size={18} />
@@ -127,9 +127,6 @@ export default function ReportesPage() {
                             onChange={(e) => setFiltro(e.target.value)}
                         />
                     </div>
-                    <button onClick={() => window.print()} className="bg-slate-900 hover:bg-black text-white px-8 py-4 rounded-[1.5rem] font-black tracking-widest text-xs uppercase flex items-center justify-center gap-3 transition-all active:scale-95 shadow-md shrink-0">
-                        <Printer size={18} /> <span className="sm:hidden md:block">Imprimir</span>
-                    </button>
                 </div>
 
                 {/* LISTADO DE RESULTADOS (SMART CARDS) */}

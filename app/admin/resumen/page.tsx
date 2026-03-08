@@ -21,26 +21,32 @@ export default function ResumenPage() {
   }, [range])
 
   const fetchResumen = async () => {
-    let inicio = new Date()
-    inicio.setHours(0, 0, 0, 0)
-    let fin = new Date()
-    fin.setHours(23, 59, 59, 999)
+    // --- LÓGICA DE FECHAS A PRUEBA DE ZONA HORARIA ---
+    const dateToLocalISO = (d: Date) => {
+      const pad = (n: number) => n.toString().padStart(2, '0');
+      return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    };
+
+    const hoy = new Date();
+    let start = new Date();
+    let end = new Date();
 
     if (range === 'ayer') {
-      inicio.setDate(inicio.getDate() - 1)
-      fin.setDate(fin.getDate() - 1)
-      fin.setHours(23, 59, 59)
+      start.setDate(hoy.getDate() - 1);
+      end.setDate(hoy.getDate() - 1);
     } else if (range === 'semana') {
-      inicio.setDate(inicio.getDate() - 7)
+      start.setDate(hoy.getDate() - 7);
     } else if (range === 'mes') {
-      inicio.setMonth(inicio.getMonth() - 1)
+      start.setMonth(hoy.getMonth() - 1);
     } else if (range === 'siempre') {
-      inicio = new Date(2020, 0, 1)
+      start = new Date(2020, 0, 1);
     }
 
-    const inicioISO = inicio.toISOString()
-    const finISO = fin.toISOString()
+    // Armamos el string exacto sin usar .toISOString() global para evitar el desfase UTC
+    const inicioISO = `${dateToLocalISO(start)}T00:00:00`;
+    const finISO = range === 'siempre' ? '2099-12-31T23:59:59' : `${dateToLocalISO(end)}T23:59:59`;
 
+    // --- CONSULTAS ---
     const [lav, par, inv] = await Promise.all([
       supabase.from('ordenes_servicio').select('*').gte('creado_en', inicioISO).lte('creado_en', finISO),
       supabase.from('parqueadero_registros').select('*').eq('estado', 'finalizado').gte('hora_salida', inicioISO).lte('hora_salida', finISO),
@@ -70,7 +76,14 @@ export default function ResumenPage() {
   const totalTransferencia = data.lavadero.transferencia + data.parqueadero.transferencia + data.inventario.transferencia
 
   return (
-    <div className="min-h-screen pt-16 lg:pt-0 bg-[#F8FAFC] text-slate-900 p-4 md:p-8 lg:p-10 pb-24 overflow-x-hidden">
+    // Corrección del Padding Top para Móvil (pt-24)
+    <div className="min-h-screen pt-24 lg:pt-10 bg-[#F8FAFC] text-slate-900 px-4 md:px-8 lg:px-10 pb-24 overflow-x-hidden">
+
+      <style jsx global>{`
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      `}</style>
+
       <main className="max-w-7xl mx-auto space-y-8 lg:space-y-10">
 
         {/* HEADER CON SELECTOR */}
@@ -84,12 +97,13 @@ export default function ResumenPage() {
               Balance <span className="text-gorilla-orange">Financiero</span>
             </h1>
 
-            <div className="mt-6 flex flex-wrap bg-white p-1.5 rounded-[1.5rem] border border-slate-200/60 shadow-sm w-fit gap-1">
+            {/* Menú de filtros con Scroll Horizontal en Móvil */}
+            <div className="mt-6 flex flex-nowrap overflow-x-auto no-scrollbar bg-white p-1.5 rounded-[1.5rem] border border-slate-200/60 shadow-sm w-full md:w-fit gap-1">
               {['hoy', 'ayer', 'semana', 'mes', 'siempre'].map((r) => (
                 <button
                   key={r}
                   onClick={() => setRange(r)}
-                  className={`px-4 py-2.5 rounded-xl text-[10px] md:text-xs font-black uppercase tracking-widest transition-all ${range === r ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}
+                  className={`shrink-0 px-5 py-2.5 rounded-xl text-[10px] md:text-xs font-black uppercase tracking-widest transition-all ${range === r ? 'bg-slate-900 text-white shadow-md' : 'text-slate-500 hover:text-slate-800 hover:bg-slate-50'}`}
                 >
                   {r}
                 </button>
@@ -97,7 +111,7 @@ export default function ResumenPage() {
             </div>
           </div>
 
-          {/* TARJETA RECAUDO TOTAL (Se adapta al 100% en pantallas medianas) */}
+          {/* TARJETA RECAUDO TOTAL */}
           <motion.div
             key={granTotal}
             initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
