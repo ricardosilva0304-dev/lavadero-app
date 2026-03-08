@@ -90,14 +90,22 @@ export default function ConfiguracionPage() {
     setModalUsuario(true)
   }
   const guardarUsuario = async () => {
-    if (!formUsuario.cedula) return
+    if (!formUsuario.cedula) return;
+
     if (formUsuario.id) {
-      await supabase.from('perfiles').update(formUsuario).eq('id', formUsuario.id)
+      // ACTUALIZAR: Aquí enviamos todo menos el id, o solo los cambios
+      const { id, ...dataToUpdate } = formUsuario;
+      const { error } = await supabase.from('perfiles').update(dataToUpdate).eq('id', id);
+      if (error) console.error("Error al actualizar:", error);
     } else {
-      await supabase.from('perfiles').insert([formUsuario])
+      // INSERTAR: Eliminamos el campo id antes de insertar
+      const { id, ...dataToInsert } = formUsuario;
+      const { error } = await supabase.from('perfiles').insert([dataToInsert]);
+      if (error) console.error("Error al insertar:", error);
     }
-    setModalUsuario(false)
-    fetchData()
+
+    setModalUsuario(false);
+    fetchData();
   }
 
   // --- FUNCIONES GLOBALES ---
