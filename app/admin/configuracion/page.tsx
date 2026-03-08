@@ -59,14 +59,25 @@ export default function ConfiguracionPage() {
     setModalServicio(true)
   }
   const guardarServicio = async () => {
-    if (!formServicio.nombre) return
+    if (!formServicio.nombre) return;
+
+    let query;
     if (formServicio.id) {
-      await supabase.from('servicios').update(formServicio).eq('id', formServicio.id)
+      query = supabase.from('servicios').update(formServicio).eq('id', formServicio.id);
     } else {
-      await supabase.from('servicios').insert([formServicio])
+      const { id, ...dataToInsert } = formServicio; // Quitamos el id al insertar
+      query = supabase.from('servicios').insert([dataToInsert]);
     }
-    setModalServicio(false)
-    fetchData()
+
+    const { data, error } = await query;
+
+    if (error) {
+      console.error("Error detallado de Supabase:", error);
+      alert(`Error: ${error.message} - ${error.details}`);
+    } else {
+      setModalServicio(false);
+      fetchData();
+    }
   }
 
   // --- LÓGICA DE USUARIOS ---
