@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
-import { FileText, Package, Clock, Search, Printer, TrendingUp, Calendar, Tag, Car } from 'lucide-react'
+import { FileText, Package, Clock, Search, TrendingUp, Calendar, Tag, Car, Printer } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 
 export const dynamic = 'force-dynamic'
@@ -13,13 +13,11 @@ export default function ReportesPage() {
     const [loading, setLoading] = useState(true)
     const [filtro, setFiltro] = useState('')
 
-    useEffect(() => {
-        fetchReporte()
-    }, [activeTab])
+    useEffect(() => { fetchReporte() }, [activeTab])
 
     const fetchReporte = async () => {
         setLoading(true)
-        let query;
+        let query: any
         if (activeTab === 'ventas') {
             query = supabase.from('ordenes_servicio').select('*, perfiles(nombre)').order('creado_en', { ascending: false })
         } else if (activeTab === 'inventario') {
@@ -33,18 +31,21 @@ export default function ReportesPage() {
     }
 
     const dataFiltrada = data.filter(item => {
-        const textoBusqueda = filtro.toLowerCase()
+        const t = filtro.toLowerCase()
         return (
-            (item.placa?.toLowerCase().includes(textoBusqueda)) ||
-            (item.nombre?.toLowerCase().includes(textoBusqueda)) ||
-            (item.nombres_servicios?.toLowerCase().includes(textoBusqueda)) ||
-            (item.categoria?.toLowerCase().includes(textoBusqueda))
+            (item.placa?.toLowerCase().includes(t)) ||
+            (item.nombre?.toLowerCase().includes(t)) ||
+            (item.nombres_servicios?.toLowerCase().includes(t)) ||
+            (item.categoria?.toLowerCase().includes(t))
         )
     })
 
-    const totalMonto = dataFiltrada.reduce((acc, item) => acc + (Number(item.total || item.total_pagar || item.precio_venta || 0)), 0)
+    // CORRECCIÓN: parseFloat en todos los campos numéricos para evitar NaN
+    const totalMonto = dataFiltrada.reduce((acc, item) => {
+        const val = parseFloat(item.total ?? item.total_pagar ?? item.precio_venta ?? 0) || 0
+        return acc + val
+    }, 0)
 
-    // Formateador de datos para unificar la vista de la tarjeta
     const formatItem = (item: any) => {
         if (activeTab === 'inventario') {
             return {
@@ -52,7 +53,7 @@ export default function ReportesPage() {
                 subtitulo: item.categoria || 'Producto',
                 detalle: `Stock actual: ${item.stock}`,
                 isCritico: item.stock <= (item.stock_minimo || 0),
-                valor: item.precio_venta,
+                valor: parseFloat(item.precio_venta) || 0,
                 fecha: null,
                 icon: <Package size={18} />
             }
@@ -63,77 +64,81 @@ export default function ReportesPage() {
                 subtitulo: item.perfiles?.nombre || 'General',
                 detalle: item.nombres_servicios,
                 isCritico: false,
-                valor: item.total,
+                valor: parseFloat(item.total) || 0,
                 fecha: new Date(item.creado_en).toLocaleDateString('es-CO'),
                 icon: <Car size={18} />
             }
         }
-        // Parqueadero
         return {
             titulo: item.placa,
             subtitulo: 'Parqueo Finalizado',
             detalle: item.tipo_tarifa === 'dia' ? 'Cobro por Día' : 'Cobro por Mes',
             isCritico: false,
-            valor: item.total_pagar,
+            valor: parseFloat(item.total_pagar) || 0,
             fecha: new Date(item.hora_salida).toLocaleDateString('es-CO'),
             icon: <Clock size={18} />
         }
     }
 
     return (
-        // AQUÍ ESTÁ EL ARREGLO DEL PADDING (pt-24 lg:pt-10) PARA QUE NO QUEDE PEGADO AL TECHO
-        <div className="min-h-screen pt-24 lg:pt-10 bg-[#F8FAFC] text-slate-900 px-4 sm:px-6 md:px-10 pb-32 overflow-x-hidden">
+        <div className="min-h-screen pt-20 lg:pt-10 bg-[#F8FAFC] text-slate-900 px-4 sm:px-6 md:px-8 lg:px-10 pb-36 overflow-x-hidden">
             <style jsx global>{`
-                @media print {
-                nav, .no-print, button, header { display: none !important; }
-                .print-only { display: block !important; }
-                body { background: white; }
-                .print-card { break-inside: avoid; border: 1px solid #e2e8f0; box-shadow: none !important; }
-                }
-                .no-scrollbar::-webkit-scrollbar { display: none; }
-                .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-            `}</style>
+        @media print {
+          nav, .no-print, button, header { display: none !important; }
+          body { background: white; }
+          .print-card { break-inside: avoid; border: 1px solid #e2e8f0; box-shadow: none !important; }
+        }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+      `}</style>
 
-            <div className="max-w-5xl mx-auto space-y-8">
+            <div className="max-w-5xl mx-auto space-y-6 sm:space-y-8">
 
-                {/* ENCABEZADO Y TABS */}
-                <header className="flex flex-col xl:flex-row justify-between items-start xl:items-end gap-6 no-print">
-                    <div>
-                        <div className="flex items-center gap-3 mb-2">
-                            <div className="h-1 w-8 bg-gorilla-purple rounded-full" />
-                            <span className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-400">Auditoría Digital</span>
+                {/* ENCABEZADO */}
+                <header className="flex flex-col gap-5 no-print">
+                    <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+                        <div>
+                            <div className="flex items-center gap-3 mb-2">
+                                <div className="h-1 w-8 bg-gorilla-purple rounded-full" />
+                                <span className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-400">Auditoría Digital</span>
+                            </div>
+                            <h1 className="text-3xl sm:text-4xl md:text-5xl font-black tracking-tighter uppercase italic text-slate-900 leading-none">
+                                Reportes <span className="text-gorilla-purple">Flash</span>
+                            </h1>
                         </div>
-                        <h1 className="text-4xl md:text-5xl font-black tracking-tighter uppercase italic text-slate-900 leading-none">
-                            Reportes <span className="text-gorilla-purple">Flash</span>
-                        </h1>
+                        {/* Botón Imprimir (antes faltaba en la UI) */}
+                        <button
+                            onClick={() => window.print()}
+                            className="flex items-center gap-2 bg-white border border-slate-200 text-slate-600 hover:bg-slate-50 px-4 py-3 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all shadow-sm w-fit"
+                        >
+                            <Printer size={15} /> Imprimir
+                        </button>
                     </div>
 
-                    {/* Scroll horizontal en móviles para evitar que se aplaste */}
-                    <div className="flex bg-white p-1.5 rounded-[1.5rem] shadow-sm border border-slate-200/60 w-full xl:w-auto overflow-x-auto no-scrollbar">
-                        <ReportTab label="Servicios" icon={<FileText size={16} />} active={activeTab === 'ventas'} onClick={() => setActiveTab('ventas')} />
-                        <ReportTab label="Inventario" icon={<Package size={16} />} active={activeTab === 'inventario'} onClick={() => setActiveTab('inventario')} />
-                        <ReportTab label="Parqueo" icon={<Clock size={16} />} active={activeTab === 'parqueadero'} onClick={() => setActiveTab('parqueadero')} />
+                    {/* Tabs con scroll horizontal en móvil */}
+                    <div className="flex bg-white p-1.5 rounded-[1.5rem] shadow-sm border border-slate-200/60 w-full overflow-x-auto no-scrollbar gap-1">
+                        <ReportTab label="Servicios" icon={<FileText size={15} />} active={activeTab === 'ventas'} onClick={() => setActiveTab('ventas')} />
+                        <ReportTab label="Inventario" icon={<Package size={15} />} active={activeTab === 'inventario'} onClick={() => setActiveTab('inventario')} />
+                        <ReportTab label="Parqueo" icon={<Clock size={15} />} active={activeTab === 'parqueadero'} onClick={() => setActiveTab('parqueadero')} />
                     </div>
                 </header>
 
                 {/* BUSCADOR */}
-                <div className="flex flex-col sm:flex-row gap-3 no-print">
-                    <div className="relative flex-1 group">
-                        <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-gorilla-purple transition-colors" size={18} />
-                        <input
-                            placeholder="Buscar placa, producto o detalle..."
-                            className="w-full bg-white border border-slate-200/60 p-4 pl-12 rounded-[1.5rem] outline-none font-bold text-sm shadow-sm focus:ring-4 ring-purple-50 focus:border-gorilla-purple transition-all uppercase placeholder:text-slate-300"
-                            value={filtro}
-                            onChange={(e) => setFiltro(e.target.value)}
-                        />
-                    </div>
+                <div className="relative group no-print">
+                    <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-gorilla-purple transition-colors" size={16} />
+                    <input
+                        placeholder="Buscar placa, producto o detalle..."
+                        className="w-full bg-white border border-slate-200/60 p-4 pl-12 rounded-[1.5rem] outline-none font-bold text-sm shadow-sm focus:ring-4 ring-purple-50 focus:border-gorilla-purple transition-all uppercase placeholder:text-slate-300"
+                        value={filtro}
+                        onChange={e => setFiltro(e.target.value)}
+                    />
                 </div>
 
-                {/* LISTADO DE RESULTADOS (SMART CARDS) */}
+                {/* LISTADO */}
                 <main className="space-y-3">
                     {loading ? (
                         <div className="text-center py-20 bg-white rounded-[2rem] border border-slate-100 shadow-sm">
-                            <div className="w-8 h-8 border-4 border-gorilla-purple border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+                            <div className="w-8 h-8 border-4 border-gorilla-purple border-t-transparent rounded-full animate-spin mx-auto mb-4" />
                             <p className="text-slate-400 font-bold uppercase text-[10px] tracking-widest">Generando Reporte...</p>
                         </div>
                     ) : dataFiltrada.length === 0 ? (
@@ -143,46 +148,50 @@ export default function ReportesPage() {
                         </div>
                     ) : (
                         <AnimatePresence>
-                            {dataFiltrada.map((item) => {
-                                const info = formatItem(item);
+                            {dataFiltrada.map(item => {
+                                const info = formatItem(item)
                                 return (
                                     <motion.div
                                         layout
                                         initial={{ opacity: 0, y: 5 }}
                                         animate={{ opacity: 1, y: 0 }}
                                         key={item.id}
-                                        className="print-card bg-white border border-slate-200/60 p-4 md:p-5 rounded-[1.5rem] shadow-sm hover:shadow-md hover:border-gorilla-purple/40 transition-all flex flex-col md:flex-row md:items-center justify-between gap-4 group"
+                                        className="print-card bg-white border border-slate-200/60 p-4 sm:p-5 rounded-[1.5rem] shadow-sm hover:shadow-md hover:border-gorilla-purple/40 transition-all"
                                     >
-                                        {/* Izquierda: Icono, Titulo y Subtitulo */}
-                                        <div className="flex items-center gap-4 md:w-1/3">
-                                            <div className="w-12 h-12 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 shrink-0 border border-slate-100 group-hover:text-gorilla-purple transition-colors">
-                                                {info.icon}
-                                            </div>
-                                            <div className="truncate">
-                                                <h3 className="font-black text-lg text-slate-800 uppercase tracking-tighter leading-none mb-1.5 truncate">{info.titulo || 'N/A'}</h3>
-                                                <div className="flex items-center gap-1.5 text-[10px] font-bold text-slate-400 uppercase tracking-widest truncate">
-                                                    {info.fecha && <><Calendar size={10} /> {info.fecha} •</>}
-                                                    <span className="truncate">{info.subtitulo}</span>
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-6">
+
+                                            {/* Icono + título + subtítulo */}
+                                            <div className="flex items-center gap-4 sm:w-1/3">
+                                                <div className="w-11 h-11 sm:w-12 sm:h-12 rounded-xl bg-slate-50 flex items-center justify-center text-slate-400 shrink-0 border border-slate-100">
+                                                    {info.icon}
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <h3 className="font-black text-base sm:text-lg text-slate-800 uppercase tracking-tighter leading-none mb-1 truncate">
+                                                        {info.titulo || 'N/A'}
+                                                    </h3>
+                                                    <div className="flex flex-wrap items-center gap-1 text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                                                        {info.fecha && <><Calendar size={10} /> {info.fecha} ·</>}
+                                                        <span className="truncate">{info.subtitulo}</span>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
 
-                                        {/* Centro: Detalles */}
-                                        <div className="flex-1 border-t md:border-none border-slate-100 pt-3 md:pt-0">
-                                            <div className="flex items-center gap-2">
-                                                <Tag size={14} className="text-slate-300 shrink-0" />
-                                                <p className={`text-xs font-bold uppercase leading-snug line-clamp-1 ${info.isCritico ? 'text-red-500' : 'text-slate-500'}`}>
-                                                    {info.detalle}
-                                                </p>
+                                            {/* Detalle */}
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2">
+                                                    <Tag size={13} className="text-slate-300 shrink-0" />
+                                                    <p className={`text-xs font-bold uppercase leading-snug line-clamp-1 ${info.isCritico ? 'text-red-500' : 'text-slate-500'}`}>
+                                                        {info.detalle}
+                                                    </p>
+                                                </div>
                                             </div>
-                                        </div>
 
-                                        {/* Derecha: Precio */}
-                                        <div className="text-right border-t md:border-none border-slate-100 pt-3 md:pt-0 shrink-0">
-                                            <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest block mb-0.5 md:hidden">Valor Total</span>
-                                            <span className="text-2xl font-black text-slate-900 tracking-tighter leading-none">
-                                                ${Number(info.valor || 0).toLocaleString()}
-                                            </span>
+                                            {/* Precio */}
+                                            <div className="text-right shrink-0 pt-2 sm:pt-0 border-t sm:border-none border-slate-100">
+                                                <span className="text-xl sm:text-2xl font-black text-slate-900 tracking-tighter leading-none">
+                                                    ${info.valor.toLocaleString('es-CO')}
+                                                </span>
+                                            </div>
                                         </div>
                                     </motion.div>
                                 )
@@ -190,24 +199,27 @@ export default function ReportesPage() {
                         </AnimatePresence>
                     )}
                 </main>
+            </div>
 
-                {/* WIDGET TOTAL (Fijo abajo y súper elegante) */}
-                {!loading && dataFiltrada.length > 0 && (
-                    <div className="sticky bottom-6 bg-[#0E0C15] rounded-[2rem] p-6 shadow-2xl flex justify-between items-center text-white border border-slate-800 no-print z-40 overflow-hidden">
-                        <div className="absolute left-0 top-0 w-2 h-full bg-gorilla-purple" />
-                        <div className="flex items-center gap-4 pl-2">
-                            <div className="p-3 bg-white/10 rounded-xl hidden sm:block"><TrendingUp size={24} className="text-gorilla-purple" /></div>
+            {/* TOTAL FLOTANTE */}
+            {!loading && dataFiltrada.length > 0 && (
+                <div className="fixed bottom-4 sm:bottom-6 left-4 right-4 sm:left-auto sm:right-6 lg:right-10 z-40 no-print">
+                    <div className="bg-[#0E0C15] rounded-[1.5rem] sm:rounded-[2rem] px-5 sm:px-8 py-4 sm:py-5 shadow-2xl flex justify-between sm:gap-10 items-center text-white border border-slate-800">
+                        <div className="flex items-center gap-3 sm:gap-4">
+                            <div className="p-2.5 bg-white/10 rounded-xl hidden sm:block">
+                                <TrendingUp size={22} className="text-gorilla-purple" />
+                            </div>
                             <div>
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total de este reporte</p>
-                                <p className="text-[10px] font-bold text-slate-500 uppercase">{dataFiltrada.length} Registros encontrados</p>
+                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Total reporte</p>
+                                <p className="text-[10px] font-bold text-slate-500 uppercase">{dataFiltrada.length} registros</p>
                             </div>
                         </div>
-                        <div className="text-right">
-                            <p className="text-3xl sm:text-4xl font-black tracking-tighter text-white leading-none">${totalMonto.toLocaleString()}</p>
-                        </div>
+                        <p className="text-2xl sm:text-3xl font-black tracking-tighter text-white">
+                            ${totalMonto.toLocaleString('es-CO')}
+                        </p>
                     </div>
-                )}
-            </div>
+                </div>
+            )}
         </div>
     )
 }
@@ -216,9 +228,7 @@ function ReportTab({ label, icon, active, onClick }: any) {
     return (
         <button
             onClick={onClick}
-            className={`flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all whitespace-nowrap shrink-0 ${active
-                    ? 'bg-gorilla-purple text-white shadow-md'
-                    : 'bg-transparent text-slate-500 hover:bg-slate-50'
+            className={`flex items-center justify-center gap-2 px-4 sm:px-6 py-3.5 rounded-xl font-black text-[10px] uppercase tracking-widest transition-all whitespace-nowrap shrink-0 ${active ? 'bg-gorilla-purple text-white shadow-md' : 'bg-transparent text-slate-500 hover:bg-slate-50'
                 }`}
         >
             <span className={active ? 'opacity-100' : 'opacity-50'}>{icon}</span> {label}
