@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import {
   Car, Bike, Clock, User, Phone, LogOut,
@@ -21,51 +21,62 @@ export default function ParqueaderoPage() {
   const [loadingIngreso, setLoadingIngreso] = useState(false)
   const [loadingRegistros, setLoadingRegistros] = useState(true)
 
-  // ── Precio con null-safety ────────────────────────────────────────────────
-  // CORRECCIÓN PRINCIPAL: si configPrecios aún no cargó o no encuentra el tipo,
-  // devuelve 0 en vez de explotar con .precio_mes de undefined
-  const obtenerPrecio = (tipoVehiculo: string, tipoCobro: string): number => {
-    if (!configPrecios || configPrecios.length === 0) return 0
-    const precios = configPrecios.find(p => p.tipo_vehiculo === tipoVehiculo)
-    if (!precios) return 0
-    return tipoCobro === 'mes'
-      ? (precios.precio_mes ?? 0)
-      : (precios.precio_dia ?? 0)
-  }
+  // Usamos useRef para la función de fetch para que el canal siempre
+  // tenga acceso a la versión más reciente sin recrearse
+  const fetchRegistrosRef = useRef<(() => Promise<void>) | null>(null)
 
-  const fetchPrecios = useCallback(async () => {
-    const { data, error } = await supabase.from('config_parqueadero').select('*')
-    if (!error) setConfigPrecios(data || [])
-  }, [])
-
-  const fetchRegistros = useCallback(async () => {
+  const fetchRegistros = async () => {
     setLoadingRegistros(true)
     const { data, error } = await supabase
       .from('parqueadero_registros')
       .select('*')
       .eq('estado', 'activo')
       .order('hora_entrada', { ascending: false })
-    if (!error) {
-      // CORRECCIÓN: filtramos cualquier registro que venga con id null
-      setRegistros((data || []).filter(r => r.id != null))
-    }
+    if (!error) setRegistros((data || []).filter(r => r.id != null))
     setLoadingRegistros(false)
-  }, [])
+  }
 
+  // Siempre actualizamos el ref con la función más reciente
+  fetchRegistrosRef.current = fetchRegistros
+
+  const fetchPrecios = async () => {
+    const { data, error } = await supabase.from('config_parqueadero').select('*')
+    if (!error) setConfigPrecios(data || [])
+  }
+
+  // Carga inicial — solo una vez
   useEffect(() => {
     fetchPrecios()
     fetchRegistros()
-  }, [fetchPrecios, fetchRegistros])
+  }, [])
 
-  // Tiempo real
+  // Canal de realtime — se crea UNA sola vez y nunca se recrea
+  // Llama siempre a fetchRegistrosRef.current para tener el fetch fresco
   useEffect(() => {
     const channel = supabase
-      .channel('parqueadero_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'parqueadero_registros' },
-        () => fetchRegistros())
-      .subscribe()
-    return () => { supabase.removeChannel(channel) }
-  }, [fetchRegistros])
+      .channel('parqueadero_channel')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'parqueadero_registros' },
+        () => {
+          fetchRegistrosRef.current?.()
+        }
+      )
+      .subscribe((status) => {
+        console.log('Parqueadero realtime status:', status)
+      })
+
+    return () => {
+      supabase.removeChannel(channel)
+    }
+  }, []) // ← sin dependencias: se monta una vez, se desmonta una vez
+
+  const obtenerPrecio = (tipoVehiculo: string, tipoCobro: string): number => {
+    if (!configPrecios || configPrecios.length === 0) return 0
+    const precios = configPrecios.find(p => p.tipo_vehiculo === tipoVehiculo)
+    if (!precios) return 0
+    return tipoCobro === 'mes' ? (precios.precio_mes ?? 0) : (precios.precio_dia ?? 0)
+  }
 
   const handleIngreso = async (e: any) => {
     e.preventDefault()
@@ -86,12 +97,16 @@ export default function ParqueaderoPage() {
     }
   }
 
+  const abrirModalSalida = (reg: any) => {
+    if (!reg?.id) return
+    setVehiculoSalida(reg)
+    setPagoSeleccionado('efectivo')
+    setTarifaSeleccionada('dia')
+  }
+
   const confirmarSalida = async () => {
-    // CORRECCIÓN: guardamos antes de confirmar que vehiculoSalida y su id existen
     if (!vehiculoSalida?.id) return
-
     const total = obtenerPrecio(vehiculoSalida.tipo_vehiculo, tarifaSeleccionada)
-
     const { error } = await supabase
       .from('parqueadero_registros')
       .update({
@@ -112,25 +127,14 @@ export default function ParqueaderoPage() {
     }
   }
 
-  const abrirModalSalida = (reg: any) => {
-    // CORRECCIÓN: solo abrimos el modal si el registro tiene id válido
-    if (!reg?.id) return
-    setVehiculoSalida(reg)
-    setPagoSeleccionado('efectivo')
-    setTarifaSeleccionada('dia')
-  }
-
   const formatearHora = (fecha: string) => {
     try {
       return new Intl.DateTimeFormat('es-CO', {
         hour: '2-digit', minute: '2-digit', hour12: true
       }).format(new Date(fecha))
-    } catch {
-      return '--:--'
-    }
+    } catch { return '--:--' }
   }
 
-  // Precio preview para el modal (recalcula cada vez que cambia la tarifa)
   const precioModal = vehiculoSalida
     ? obtenerPrecio(vehiculoSalida.tipo_vehiculo, tarifaSeleccionada)
     : 0
@@ -151,7 +155,6 @@ export default function ParqueaderoPage() {
                 Gestión <span className="text-gorilla-orange">Parqueo</span>
               </h1>
             </div>
-            {/* Indicador tiempo real */}
             <div className="flex items-center gap-2 bg-green-50 border border-green-100 px-3 py-2 rounded-xl w-fit h-fit">
               <span className="relative flex h-2 w-2">
                 <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-500 opacity-75" />
@@ -162,7 +165,6 @@ export default function ParqueaderoPage() {
           </div>
         </header>
 
-        {/* LAYOUT PRINCIPAL */}
         <div className="grid grid-cols-1 xl:grid-cols-12 gap-6 lg:gap-8 pb-20">
 
           {/* PANEL INGRESO */}
@@ -173,14 +175,11 @@ export default function ParqueaderoPage() {
               </h2>
 
               <form onSubmit={handleIngreso} className="space-y-4">
-                {/* Carro / Moto */}
                 <div className="flex bg-slate-100 rounded-[1.5rem] p-1.5 border border-slate-200/60">
                   {(['carro', 'moto'] as const).map(tipo => (
                     <button key={tipo} type="button"
                       onClick={() => setForm(f => ({ ...f, tipo }))}
-                      className={`flex-1 py-3.5 rounded-[1.2rem] font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${form.tipo === tipo
-                          ? 'bg-white text-slate-900 shadow-sm'
-                          : 'text-slate-400 hover:text-slate-600'
+                      className={`flex-1 py-3.5 rounded-[1.2rem] font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${form.tipo === tipo ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'
                         }`}>
                       {tipo === 'carro'
                         ? <Car size={16} className={form.tipo === tipo ? 'text-gorilla-orange' : ''} />
@@ -191,11 +190,8 @@ export default function ParqueaderoPage() {
                   ))}
                 </div>
 
-                {/* Placa */}
                 <div className="relative">
-                  <div className="absolute top-3 left-5 bg-slate-900 text-white text-[9px] font-bold px-2 py-1 rounded uppercase tracking-widest z-10">
-                    Placa
-                  </div>
+                  <div className="absolute top-3 left-5 bg-slate-900 text-white text-[9px] font-bold px-2 py-1 rounded uppercase tracking-widest z-10">Placa</div>
                   <input
                     placeholder="ABC 123"
                     required
@@ -205,38 +201,24 @@ export default function ParqueaderoPage() {
                   />
                 </div>
 
-                {/* Datos cliente */}
                 <div className="space-y-3">
                   <div className="relative">
                     <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={15} />
-                    <input
-                      placeholder="Nombre (Opcional)"
+                    <input placeholder="Nombre (Opcional)"
                       className="w-full bg-white border border-slate-200/60 p-4 pl-11 rounded-2xl outline-none focus:border-gorilla-orange transition-all font-bold text-xs uppercase text-slate-700 placeholder:text-slate-400"
-                      value={form.nombre}
-                      onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))}
-                    />
+                      value={form.nombre} onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))} />
                   </div>
                   <div className="relative">
                     <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={15} />
-                    <input
-                      placeholder="Celular (Opcional)"
-                      type="tel"
+                    <input placeholder="Celular (Opcional)" type="tel"
                       className="w-full bg-white border border-slate-200/60 p-4 pl-11 rounded-2xl outline-none focus:border-gorilla-orange transition-all font-bold text-xs text-slate-700 placeholder:text-slate-400"
-                      value={form.celular}
-                      onChange={e => setForm(f => ({ ...f, celular: e.target.value }))}
-                    />
+                      value={form.celular} onChange={e => setForm(f => ({ ...f, celular: e.target.value }))} />
                   </div>
                 </div>
 
-                <button
-                  type="submit"
-                  disabled={loadingIngreso || !form.placa.trim()}
-                  className="w-full bg-gorilla-orange hover:bg-orange-600 text-white font-black py-4 sm:py-5 rounded-2xl shadow-lg shadow-orange-500/20 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3 uppercase tracking-widest text-sm"
-                >
-                  {loadingIngreso
-                    ? 'Registrando...'
-                    : <><span>Registrar Ingreso</span> <ArrowRight size={18} strokeWidth={3} /></>
-                  }
+                <button type="submit" disabled={loadingIngreso || !form.placa.trim()}
+                  className="w-full bg-gorilla-orange hover:bg-orange-600 text-white font-black py-4 sm:py-5 rounded-2xl shadow-lg shadow-orange-500/20 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3 uppercase tracking-widest text-sm">
+                  {loadingIngreso ? 'Registrando...' : <><span>Registrar Ingreso</span><ArrowRight size={18} strokeWidth={3} /></>}
                 </button>
               </form>
             </div>
@@ -272,28 +254,19 @@ export default function ParqueaderoPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-4 lg:gap-5">
                 <AnimatePresence>
                   {registros.map(reg => (
-                    <motion.div
-                      layout
-                      initial={{ opacity: 0, scale: 0.95 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      exit={{ opacity: 0, scale: 0.95 }}
-                      key={reg.id}
-                      className="bg-white border border-slate-200/60 p-5 rounded-[1.5rem] shadow-sm hover:shadow-md hover:border-gorilla-orange/40 transition-all flex flex-col"
-                    >
+                    <motion.div layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} key={reg.id}
+                      className="bg-white border border-slate-200/60 p-5 rounded-[1.5rem] shadow-sm hover:shadow-md hover:border-gorilla-orange/40 transition-all flex flex-col">
                       <div className="flex justify-between items-start mb-4">
                         <div className={`p-3 rounded-xl shrink-0 ${reg.tipo_vehiculo === 'carro' ? 'bg-blue-50 text-blue-600' : 'bg-orange-50 text-gorilla-orange'}`}>
                           {reg.tipo_vehiculo === 'carro' ? <Car size={22} /> : <Bike size={22} />}
                         </div>
                         <div className="text-right">
-                          <span className="text-2xl sm:text-3xl font-black text-slate-900 block tracking-tighter leading-none">
-                            {reg.placa}
-                          </span>
+                          <span className="text-2xl sm:text-3xl font-black text-slate-900 block tracking-tighter leading-none">{reg.placa}</span>
                           <div className="flex items-center justify-end gap-1 mt-1 text-[10px] text-slate-400 font-bold uppercase tracking-widest">
                             <Clock size={10} /> {formatearHora(reg.hora_entrada)}
                           </div>
                         </div>
                       </div>
-
                       <div className="flex flex-col gap-1.5 mb-5 flex-1">
                         <div className="flex items-center gap-2 text-[11px] font-bold text-slate-600 uppercase truncate">
                           <User size={12} className="text-gorilla-purple shrink-0" />
@@ -304,11 +277,8 @@ export default function ParqueaderoPage() {
                           {reg.celular || '---'}
                         </div>
                       </div>
-
-                      <button
-                        onClick={() => abrirModalSalida(reg)}
-                        className="w-full bg-slate-50 hover:bg-red-500 text-slate-500 hover:text-white py-3.5 rounded-xl font-black transition-all border border-slate-200 hover:border-red-500 flex items-center justify-center gap-2 uppercase tracking-widest text-[10px]"
-                      >
+                      <button onClick={() => abrirModalSalida(reg)}
+                        className="w-full bg-slate-50 hover:bg-red-500 text-slate-500 hover:text-white py-3.5 rounded-xl font-black transition-all border border-slate-200 hover:border-red-500 flex items-center justify-center gap-2 uppercase tracking-widest text-[10px]">
                         Dar Salida <LogOut size={14} />
                       </button>
                     </motion.div>
@@ -324,37 +294,25 @@ export default function ParqueaderoPage() {
       <AnimatePresence>
         {vehiculoSalida && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-            <motion.div
-              initial={{ scale: 0.95, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 0.95, opacity: 0, y: 20 }}
-              className="bg-white rounded-[2.5rem] p-6 sm:p-8 max-w-md w-full shadow-2xl overflow-hidden"
-            >
+            <motion.div initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              className="bg-white rounded-[2.5rem] p-6 sm:p-8 max-w-md w-full shadow-2xl overflow-hidden">
               <div className="flex justify-between items-center mb-7">
                 <div>
                   <h2 className="text-xl sm:text-2xl font-black italic uppercase text-slate-900 tracking-tight leading-none">
                     Liquidación <span className="text-gorilla-orange">Caja</span>
                   </h2>
-                  <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400">
-                    Salida de parqueadero
-                  </span>
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Salida de parqueadero</span>
                 </div>
-                <button
-                  onClick={() => setVehiculoSalida(null)}
-                  className="p-2 bg-slate-100 rounded-full text-slate-500 hover:bg-slate-200 transition-colors"
-                >
+                <button onClick={() => setVehiculoSalida(null)} className="p-2 bg-slate-100 rounded-full text-slate-500 hover:bg-slate-200 transition-colors">
                   <X size={20} />
                 </button>
               </div>
 
-              {/* Tarjeta resumen */}
               <div className="bg-[#0E0C15] rounded-[1.5rem] p-6 text-white mb-7 flex justify-between items-center relative overflow-hidden shadow-lg border border-slate-800">
                 <div className="absolute top-0 left-0 w-1.5 h-full bg-gorilla-orange" />
                 <div>
                   <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest mb-1">Matrícula</p>
-                  <p className="text-3xl sm:text-4xl font-black tracking-tighter text-white">
-                    {vehiculoSalida.placa}
-                  </p>
+                  <p className="text-3xl sm:text-4xl font-black tracking-tighter text-white">{vehiculoSalida.placa}</p>
                 </div>
                 <div className="text-right">
                   <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest mb-1">A Pagar</p>
@@ -364,15 +322,13 @@ export default function ParqueaderoPage() {
                 </div>
               </div>
 
-              {/* Tipo estancia */}
               <div className="space-y-3 mb-5">
                 <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-1.5">
                   <Calendar size={12} /> Tipo de Estancia
                 </p>
                 <div className="grid grid-cols-2 gap-3">
                   {(['dia', 'mes'] as const).map(t => (
-                    <button key={t} type="button"
-                      onClick={() => setTarifaSeleccionada(t)}
+                    <button key={t} type="button" onClick={() => setTarifaSeleccionada(t)}
                       className={`py-4 rounded-xl font-black uppercase text-[10px] border-2 transition-all tracking-widest flex items-center justify-center gap-2 ${tarifaSeleccionada === t
                           ? 'border-gorilla-orange bg-orange-50 text-gorilla-orange'
                           : 'border-slate-100 bg-white text-slate-400 hover:border-slate-200 hover:bg-slate-50'
@@ -384,24 +340,19 @@ export default function ParqueaderoPage() {
                 </div>
               </div>
 
-              {/* Método de pago */}
               <div className="space-y-3 mb-7">
                 <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-1.5">
                   <DollarSign size={12} /> Método de Pago
                 </p>
                 <div className="grid grid-cols-2 gap-3">
                   <button type="button" onClick={() => setPagoSeleccionado('efectivo')}
-                    className={`py-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all ${pagoSeleccionado === 'efectivo'
-                        ? 'border-green-500 bg-green-50 text-green-600'
-                        : 'border-slate-100 bg-white text-slate-400 hover:border-slate-200'
+                    className={`py-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all ${pagoSeleccionado === 'efectivo' ? 'border-green-500 bg-green-50 text-green-600' : 'border-slate-100 bg-white text-slate-400 hover:border-slate-200'
                       }`}>
                     <DollarSign size={20} />
                     <span className="font-black text-[10px] uppercase tracking-widest">EFECTIVO</span>
                   </button>
                   <button type="button" onClick={() => setPagoSeleccionado('transferencia')}
-                    className={`py-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all ${pagoSeleccionado === 'transferencia'
-                        ? 'border-blue-500 bg-blue-50 text-blue-600'
-                        : 'border-slate-100 bg-white text-slate-400 hover:border-slate-200'
+                    className={`py-4 rounded-xl border-2 flex flex-col items-center gap-2 transition-all ${pagoSeleccionado === 'transferencia' ? 'border-blue-500 bg-blue-50 text-blue-600' : 'border-slate-100 bg-white text-slate-400 hover:border-slate-200'
                       }`}>
                     <CreditCard size={20} />
                     <span className="font-black text-[10px] uppercase tracking-widest">TRANSFER</span>
@@ -409,15 +360,11 @@ export default function ParqueaderoPage() {
                 </div>
               </div>
 
-              <button
-                onClick={confirmarSalida}
-                disabled={precioModal === 0 && configPrecios.length > 0}
-                className="w-full bg-slate-900 hover:bg-black text-white p-5 rounded-2xl font-black uppercase tracking-widest text-sm shadow-xl flex items-center justify-center gap-3 transition-all active:scale-95 disabled:opacity-50"
-              >
+              <button onClick={confirmarSalida}
+                className="w-full bg-slate-900 hover:bg-black text-white p-5 rounded-2xl font-black uppercase tracking-widest text-sm shadow-xl flex items-center justify-center gap-3 transition-all active:scale-95">
                 Cerrar Operación <CheckCircle2 size={20} />
               </button>
 
-              {/* Aviso si los precios no están configurados */}
               {configPrecios.length === 0 && (
                 <p className="text-center text-[10px] text-red-400 font-bold uppercase tracking-widest mt-3">
                   ⚠️ Sin tarifas configuradas — ve a Configuración
