@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import {
   Car, Bike, Clock, User, Phone, LogOut,
-  ArrowRight, Shield, DollarSign, CreditCard,
+  ArrowRight, DollarSign, CreditCard,
   X, CheckCircle2, Calendar, Check, Zap
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -19,75 +19,121 @@ export default function ParqueaderoPage() {
   const [tarifaSeleccionada, setTarifaSeleccionada] = useState<'dia' | 'mes'>('dia')
   const [form, setForm] = useState({ nombre: '', celular: '', placa: '', tipo: 'carro' })
   const [loadingIngreso, setLoadingIngreso] = useState(false)
+  const [loadingRegistros, setLoadingRegistros] = useState(true)
+
+  // ── Precio con null-safety ────────────────────────────────────────────────
+  // CORRECCIÓN PRINCIPAL: si configPrecios aún no cargó o no encuentra el tipo,
+  // devuelve 0 en vez de explotar con .precio_mes de undefined
+  const obtenerPrecio = (tipoVehiculo: string, tipoCobro: string): number => {
+    if (!configPrecios || configPrecios.length === 0) return 0
+    const precios = configPrecios.find(p => p.tipo_vehiculo === tipoVehiculo)
+    if (!precios) return 0
+    return tipoCobro === 'mes'
+      ? (precios.precio_mes ?? 0)
+      : (precios.precio_dia ?? 0)
+  }
 
   const fetchPrecios = useCallback(async () => {
-    const { data } = await supabase.from('config_parqueadero').select('*')
-    setConfigPrecios(data || [])
+    const { data, error } = await supabase.from('config_parqueadero').select('*')
+    if (!error) setConfigPrecios(data || [])
   }, [])
 
   const fetchRegistros = useCallback(async () => {
-    const { data } = await supabase
+    setLoadingRegistros(true)
+    const { data, error } = await supabase
       .from('parqueadero_registros')
       .select('*')
       .eq('estado', 'activo')
       .order('hora_entrada', { ascending: false })
-    setRegistros(data || [])
+    if (!error) {
+      // CORRECCIÓN: filtramos cualquier registro que venga con id null
+      setRegistros((data || []).filter(r => r.id != null))
+    }
+    setLoadingRegistros(false)
   }, [])
 
-  // Carga inicial
   useEffect(() => {
     fetchPrecios()
     fetchRegistros()
   }, [fetchPrecios, fetchRegistros])
 
-  // Tiempo real: cualquier cambio en parqueadero_registros se refleja al instante
+  // Tiempo real
   useEffect(() => {
     const channel = supabase
       .channel('parqueadero_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'parqueadero_registros' }, () => fetchRegistros())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'parqueadero_registros' },
+        () => fetchRegistros())
       .subscribe()
     return () => { supabase.removeChannel(channel) }
   }, [fetchRegistros])
 
   const handleIngreso = async (e: any) => {
     e.preventDefault()
-    if (!form.placa) return
+    if (!form.placa.trim()) return
     setLoadingIngreso(true)
-    await supabase.from('parqueadero_registros').insert([{
-      nombre_cliente: form.nombre,
-      celular: form.celular,
-      placa: form.placa.toUpperCase(),
-      tipo_vehiculo: form.tipo
-    }])
-    setForm({ nombre: '', celular: '', placa: '', tipo: 'carro' })
-    setLoadingIngreso(false)
-    // El realtime recarga automáticamente
-  }
-
-  const obtenerPrecio = (tipoVehiculo: string, tipoCobro: string) => {
-    const precios = configPrecios.find(p => p.tipo_vehiculo === tipoVehiculo)
-    if (!precios) return 0
-    return tipoCobro === 'mes' ? precios.precio_mes : precios.precio_dia
-  }
-
-  const confirmarSalida = async () => {
-    const total = obtenerPrecio(vehiculoSalida.tipo_vehiculo, tarifaSeleccionada)
-    const { error } = await supabase.from('parqueadero_registros').update({
-      estado: 'finalizado',
-      hora_salida: new Date().toISOString(),
-      total_pagar: total,
-      metodo_pago: pagoSeleccionado,
-      tipo_tarifa: tarifaSeleccionada
-    }).eq('id', vehiculoSalida.id)
-
-    if (!error) {
-      setVehiculoSalida(null)
-      // El realtime recarga automáticamente
+    try {
+      await supabase.from('parqueadero_registros').insert([{
+        nombre_cliente: form.nombre || null,
+        celular: form.celular || null,
+        placa: form.placa.toUpperCase().trim(),
+        tipo_vehiculo: form.tipo
+      }])
+      setForm({ nombre: '', celular: '', placa: '', tipo: 'carro' })
+    } catch (err) {
+      console.error('Error al registrar ingreso:', err)
+    } finally {
+      setLoadingIngreso(false)
     }
   }
 
-  const formatearHora = (fecha: string) =>
-    new Intl.DateTimeFormat('es-CO', { hour: '2-digit', minute: '2-digit', hour12: true }).format(new Date(fecha))
+  const confirmarSalida = async () => {
+    // CORRECCIÓN: guardamos antes de confirmar que vehiculoSalida y su id existen
+    if (!vehiculoSalida?.id) return
+
+    const total = obtenerPrecio(vehiculoSalida.tipo_vehiculo, tarifaSeleccionada)
+
+    const { error } = await supabase
+      .from('parqueadero_registros')
+      .update({
+        estado: 'finalizado',
+        hora_salida: new Date().toISOString(),
+        total_pagar: total,
+        metodo_pago: pagoSeleccionado,
+        tipo_tarifa: tarifaSeleccionada
+      })
+      .eq('id', vehiculoSalida.id)
+
+    if (!error) {
+      setVehiculoSalida(null)
+      setPagoSeleccionado('efectivo')
+      setTarifaSeleccionada('dia')
+    } else {
+      console.error('Error al confirmar salida:', error)
+    }
+  }
+
+  const abrirModalSalida = (reg: any) => {
+    // CORRECCIÓN: solo abrimos el modal si el registro tiene id válido
+    if (!reg?.id) return
+    setVehiculoSalida(reg)
+    setPagoSeleccionado('efectivo')
+    setTarifaSeleccionada('dia')
+  }
+
+  const formatearHora = (fecha: string) => {
+    try {
+      return new Intl.DateTimeFormat('es-CO', {
+        hour: '2-digit', minute: '2-digit', hour12: true
+      }).format(new Date(fecha))
+    } catch {
+      return '--:--'
+    }
+  }
+
+  // Precio preview para el modal (recalcula cada vez que cambia la tarifa)
+  const precioModal = vehiculoSalida
+    ? obtenerPrecio(vehiculoSalida.tipo_vehiculo, tarifaSeleccionada)
+    : 0
 
   return (
     <div className="min-h-screen pt-20 lg:pt-10 bg-[#F8FAFC] text-slate-900 px-4 sm:px-6 md:px-8 lg:px-10 relative overflow-x-hidden">
@@ -127,11 +173,14 @@ export default function ParqueaderoPage() {
               </h2>
 
               <form onSubmit={handleIngreso} className="space-y-4">
-                {/* Switch Carro/Moto */}
+                {/* Carro / Moto */}
                 <div className="flex bg-slate-100 rounded-[1.5rem] p-1.5 border border-slate-200/60">
                   {(['carro', 'moto'] as const).map(tipo => (
-                    <button key={tipo} type="button" onClick={() => setForm({ ...form, tipo })}
-                      className={`flex-1 py-3.5 rounded-[1.2rem] font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${form.tipo === tipo ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-400 hover:text-slate-600'
+                    <button key={tipo} type="button"
+                      onClick={() => setForm(f => ({ ...f, tipo }))}
+                      className={`flex-1 py-3.5 rounded-[1.2rem] font-black text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all ${form.tipo === tipo
+                          ? 'bg-white text-slate-900 shadow-sm'
+                          : 'text-slate-400 hover:text-slate-600'
                         }`}>
                       {tipo === 'carro'
                         ? <Car size={16} className={form.tipo === tipo ? 'text-gorilla-orange' : ''} />
@@ -143,14 +192,16 @@ export default function ParqueaderoPage() {
                 </div>
 
                 {/* Placa */}
-                <div className="relative group">
-                  <div className="absolute top-3 left-5 bg-slate-900 text-white text-[9px] font-bold px-2 py-1 rounded uppercase tracking-widest z-10">Placa</div>
+                <div className="relative">
+                  <div className="absolute top-3 left-5 bg-slate-900 text-white text-[9px] font-bold px-2 py-1 rounded uppercase tracking-widest z-10">
+                    Placa
+                  </div>
                   <input
                     placeholder="ABC 123"
                     required
                     className="w-full bg-slate-50 border border-slate-200/60 p-5 pt-9 rounded-[1.5rem] text-3xl sm:text-4xl font-black text-center uppercase tracking-tighter text-slate-900 outline-none focus:border-gorilla-orange focus:ring-4 focus:ring-orange-50 transition-all placeholder:text-slate-200 shadow-inner"
                     value={form.placa}
-                    onChange={e => setForm({ ...form, placa: e.target.value })}
+                    onChange={e => setForm(f => ({ ...f, placa: e.target.value }))}
                   />
                 </div>
 
@@ -158,23 +209,34 @@ export default function ParqueaderoPage() {
                 <div className="space-y-3">
                   <div className="relative">
                     <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={15} />
-                    <input placeholder="Nombre (Opcional)"
-                      className="w-full bg-white border border-slate-200/60 p-4 pl-11 rounded-2xl outline-none focus:border-gorilla-orange focus:ring-2 focus:ring-orange-50 transition-all font-bold text-xs uppercase text-slate-700 placeholder:text-slate-400"
-                      value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })} />
+                    <input
+                      placeholder="Nombre (Opcional)"
+                      className="w-full bg-white border border-slate-200/60 p-4 pl-11 rounded-2xl outline-none focus:border-gorilla-orange transition-all font-bold text-xs uppercase text-slate-700 placeholder:text-slate-400"
+                      value={form.nombre}
+                      onChange={e => setForm(f => ({ ...f, nombre: e.target.value }))}
+                    />
                   </div>
                   <div className="relative">
                     <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={15} />
-                    <input placeholder="Celular (Opcional)" type="tel"
-                      className="w-full bg-white border border-slate-200/60 p-4 pl-11 rounded-2xl outline-none focus:border-gorilla-orange focus:ring-2 focus:ring-orange-50 transition-all font-bold text-xs text-slate-700 placeholder:text-slate-400"
-                      value={form.celular} onChange={e => setForm({ ...form, celular: e.target.value })} />
+                    <input
+                      placeholder="Celular (Opcional)"
+                      type="tel"
+                      className="w-full bg-white border border-slate-200/60 p-4 pl-11 rounded-2xl outline-none focus:border-gorilla-orange transition-all font-bold text-xs text-slate-700 placeholder:text-slate-400"
+                      value={form.celular}
+                      onChange={e => setForm(f => ({ ...f, celular: e.target.value }))}
+                    />
                   </div>
                 </div>
 
                 <button
-                  disabled={loadingIngreso}
-                  className="w-full bg-gorilla-orange hover:bg-orange-600 text-white font-black py-4 sm:py-5 mt-2 rounded-2xl shadow-lg shadow-orange-500/20 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3 uppercase tracking-widest text-sm"
+                  type="submit"
+                  disabled={loadingIngreso || !form.placa.trim()}
+                  className="w-full bg-gorilla-orange hover:bg-orange-600 text-white font-black py-4 sm:py-5 rounded-2xl shadow-lg shadow-orange-500/20 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3 uppercase tracking-widest text-sm"
                 >
-                  {loadingIngreso ? 'Registrando...' : <>Registrar Ingreso <ArrowRight size={18} strokeWidth={3} /></>}
+                  {loadingIngreso
+                    ? 'Registrando...'
+                    : <><span>Registrar Ingreso</span> <ArrowRight size={18} strokeWidth={3} /></>
+                  }
                 </button>
               </form>
             </div>
@@ -192,7 +254,13 @@ export default function ParqueaderoPage() {
               </span>
             </div>
 
-            {registros.length === 0 ? (
+            {loadingRegistros ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-4">
+                {Array(3).fill(0).map((_, i) => (
+                  <div key={i} className="h-52 bg-white border border-slate-100 rounded-[1.5rem] animate-pulse" />
+                ))}
+              </div>
+            ) : registros.length === 0 ? (
               <div className="text-center py-24 bg-white rounded-[2.5rem] border-2 border-dashed border-slate-200 flex flex-col items-center shadow-sm">
                 <div className="w-16 h-16 bg-slate-50 rounded-full flex items-center justify-center mb-4">
                   <Clock size={32} className="text-slate-300" />
@@ -204,15 +272,22 @@ export default function ParqueaderoPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3 gap-4 lg:gap-5">
                 <AnimatePresence>
                   {registros.map(reg => (
-                    <motion.div layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} key={reg.id}
-                      className="bg-white border border-slate-200/60 p-5 rounded-[1.5rem] shadow-sm hover:shadow-md hover:border-gorilla-orange/40 transition-all group flex flex-col">
-
+                    <motion.div
+                      layout
+                      initial={{ opacity: 0, scale: 0.95 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      key={reg.id}
+                      className="bg-white border border-slate-200/60 p-5 rounded-[1.5rem] shadow-sm hover:shadow-md hover:border-gorilla-orange/40 transition-all flex flex-col"
+                    >
                       <div className="flex justify-between items-start mb-4">
-                        <div className={`p-3 rounded-xl flex items-center justify-center shrink-0 ${reg.tipo_vehiculo === 'carro' ? 'bg-blue-50 text-blue-600' : 'bg-orange-50 text-gorilla-orange'}`}>
+                        <div className={`p-3 rounded-xl shrink-0 ${reg.tipo_vehiculo === 'carro' ? 'bg-blue-50 text-blue-600' : 'bg-orange-50 text-gorilla-orange'}`}>
                           {reg.tipo_vehiculo === 'carro' ? <Car size={22} /> : <Bike size={22} />}
                         </div>
                         <div className="text-right">
-                          <span className="text-2xl sm:text-3xl font-black text-slate-900 block tracking-tighter leading-none">{reg.placa}</span>
+                          <span className="text-2xl sm:text-3xl font-black text-slate-900 block tracking-tighter leading-none">
+                            {reg.placa}
+                          </span>
                           <div className="flex items-center justify-end gap-1 mt-1 text-[10px] text-slate-400 font-bold uppercase tracking-widest">
                             <Clock size={10} /> {formatearHora(reg.hora_entrada)}
                           </div>
@@ -230,8 +305,10 @@ export default function ParqueaderoPage() {
                         </div>
                       </div>
 
-                      <button onClick={() => setVehiculoSalida(reg)}
-                        className="w-full bg-slate-50 hover:bg-red-500 text-slate-500 hover:text-white py-3.5 rounded-xl font-black transition-all border border-slate-200 hover:border-red-500 flex items-center justify-center gap-2 uppercase tracking-widest text-[10px]">
+                      <button
+                        onClick={() => abrirModalSalida(reg)}
+                        className="w-full bg-slate-50 hover:bg-red-500 text-slate-500 hover:text-white py-3.5 rounded-xl font-black transition-all border border-slate-200 hover:border-red-500 flex items-center justify-center gap-2 uppercase tracking-widest text-[10px]"
+                      >
                         Dar Salida <LogOut size={14} />
                       </button>
                     </motion.div>
@@ -247,17 +324,25 @@ export default function ParqueaderoPage() {
       <AnimatePresence>
         {vehiculoSalida && (
           <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
-            <motion.div initial={{ scale: 0.95, opacity: 0, y: 20 }} animate={{ scale: 1, opacity: 1, y: 0 }} exit={{ scale: 0.95, opacity: 0, y: 20 }}
-              className="bg-white rounded-[2.5rem] p-6 sm:p-8 max-w-md w-full shadow-2xl overflow-hidden">
-
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              className="bg-white rounded-[2.5rem] p-6 sm:p-8 max-w-md w-full shadow-2xl overflow-hidden"
+            >
               <div className="flex justify-between items-center mb-7">
                 <div>
                   <h2 className="text-xl sm:text-2xl font-black italic uppercase text-slate-900 tracking-tight leading-none">
                     Liquidación <span className="text-gorilla-orange">Caja</span>
                   </h2>
-                  <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400">Salida de parqueadero</span>
+                  <span className="text-[9px] font-bold uppercase tracking-widest text-slate-400">
+                    Salida de parqueadero
+                  </span>
                 </div>
-                <button onClick={() => setVehiculoSalida(null)} className="p-2 bg-slate-100 rounded-full text-slate-500 hover:bg-slate-200 transition-colors">
+                <button
+                  onClick={() => setVehiculoSalida(null)}
+                  className="p-2 bg-slate-100 rounded-full text-slate-500 hover:bg-slate-200 transition-colors"
+                >
                   <X size={20} />
                 </button>
               </div>
@@ -267,24 +352,27 @@ export default function ParqueaderoPage() {
                 <div className="absolute top-0 left-0 w-1.5 h-full bg-gorilla-orange" />
                 <div>
                   <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest mb-1">Matrícula</p>
-                  <p className="text-3xl sm:text-4xl font-black tracking-tighter text-white">{vehiculoSalida.placa}</p>
+                  <p className="text-3xl sm:text-4xl font-black tracking-tighter text-white">
+                    {vehiculoSalida.placa}
+                  </p>
                 </div>
                 <div className="text-right">
                   <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest mb-1">A Pagar</p>
                   <p className="text-2xl sm:text-3xl font-black text-gorilla-orange tracking-tighter">
-                    ${obtenerPrecio(vehiculoSalida.tipo_vehiculo, tarifaSeleccionada).toLocaleString('es-CO')}
+                    ${precioModal.toLocaleString('es-CO')}
                   </p>
                 </div>
               </div>
 
-              {/* Tipo de estancia */}
+              {/* Tipo estancia */}
               <div className="space-y-3 mb-5">
                 <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 flex items-center gap-1.5">
                   <Calendar size={12} /> Tipo de Estancia
                 </p>
                 <div className="grid grid-cols-2 gap-3">
                   {(['dia', 'mes'] as const).map(t => (
-                    <button key={t} type="button" onClick={() => setTarifaSeleccionada(t)}
+                    <button key={t} type="button"
+                      onClick={() => setTarifaSeleccionada(t)}
                       className={`py-4 rounded-xl font-black uppercase text-[10px] border-2 transition-all tracking-widest flex items-center justify-center gap-2 ${tarifaSeleccionada === t
                           ? 'border-gorilla-orange bg-orange-50 text-gorilla-orange'
                           : 'border-slate-100 bg-white text-slate-400 hover:border-slate-200 hover:bg-slate-50'
@@ -321,10 +409,20 @@ export default function ParqueaderoPage() {
                 </div>
               </div>
 
-              <button onClick={confirmarSalida}
-                className="w-full bg-slate-900 hover:bg-black text-white p-5 rounded-2xl font-black uppercase tracking-widest text-sm shadow-xl flex items-center justify-center gap-3 transition-all active:scale-95">
+              <button
+                onClick={confirmarSalida}
+                disabled={precioModal === 0 && configPrecios.length > 0}
+                className="w-full bg-slate-900 hover:bg-black text-white p-5 rounded-2xl font-black uppercase tracking-widest text-sm shadow-xl flex items-center justify-center gap-3 transition-all active:scale-95 disabled:opacity-50"
+              >
                 Cerrar Operación <CheckCircle2 size={20} />
               </button>
+
+              {/* Aviso si los precios no están configurados */}
+              {configPrecios.length === 0 && (
+                <p className="text-center text-[10px] text-red-400 font-bold uppercase tracking-widest mt-3">
+                  ⚠️ Sin tarifas configuradas — ve a Configuración
+                </p>
+              )}
             </motion.div>
           </div>
         )}
