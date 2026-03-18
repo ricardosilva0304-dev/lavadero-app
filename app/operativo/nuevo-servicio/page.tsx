@@ -10,11 +10,7 @@ import 'react-toastify/dist/ReactToastify.css'
 
 export const dynamic = 'force-dynamic'
 
-// ─── Utilidades ─────────────────────────────────────────────────────────────
-const formatearPrecio = (valor: number) =>
-  new Intl.NumberFormat('es-CO', { style: 'currency', currency: 'COP', maximumFractionDigits: 0 }).format(valor)
-
-// Devuelve YYYY-MM-DD en hora LOCAL (sin desfase UTC)
+// ─── Utilidades ──────────────────────────────────────────────────────────────
 const getFechaLocal = () => {
   const hoy = new Date()
   const y = hoy.getFullYear()
@@ -23,19 +19,17 @@ const getFechaLocal = () => {
   return `${y}-${m}-${d}`
 }
 
-// Convierte "YYYY-MM-DD" a ISO string en hora local (evita el salto de día por UTC)
 const fechaLocalAISO = (fechaStr: string) => {
   const [y, mo, d] = fechaStr.split('-').map(Number)
-  // Usamos mediodía local para que nunca haya salto de día por zona horaria
-  const local = new Date(y, mo - 1, d, 12, 0, 0)
-  return local.toISOString()
+  return new Date(y, mo - 1, d, 12, 0, 0).toISOString()
 }
 
 const Notification = ({
   title, description, type
 }: { title: string; description: string; type: 'success' | 'error' | 'info' }) => (
   <div className="flex items-center gap-3">
-    <div className={`p-2 rounded-xl ${type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500'} text-white shadow-lg shrink-0`}>
+    <div className={`p-2 rounded-xl shrink-0 text-white shadow-lg ${type === 'success' ? 'bg-green-500' : type === 'error' ? 'bg-red-500' : 'bg-blue-500'
+      }`}>
       {type === 'success' ? <Check size={18} strokeWidth={3} /> : <Zap size={18} />}
     </div>
     <div>
@@ -58,9 +52,11 @@ export default function NuevoServicioPage() {
   const [metodoPago, setMetodoPago] = useState<'efectivo' | 'transferencia'>('efectivo')
   const [empleadoAsignado, setEmpleadoAsignado] = useState('')
 
-  const [busquedaTelefono, setBusquedaTelefono] = useState('')
-  const [cliente, setCliente] = useState<any>(null)
-  const [nombreNuevoCliente, setNombreNuevoCliente] = useState('')
+  // ── Cliente — solo teléfono ───────────────────────────────────────────────
+  const [telefono, setTelefono] = useState('')
+  const [nombreCliente, setNombreCliente] = useState('')
+  const [clienteEncontrado, setClienteEncontrado] = useState(false)
+  const [clienteBuscado, setClienteBuscado] = useState(false)
   const [loading, setLoading] = useState(false)
 
   useEffect(() => { fetchMaestros() }, [])
@@ -77,21 +73,45 @@ export default function NuevoServicioPage() {
     transition: Bounce, hideProgressBar: true, theme: 'light'
   }
 
+  // ── Buscar cliente por teléfono ───────────────────────────────────────────
   const buscarCliente = async () => {
-    if (!busquedaTelefono) return
+    if (!telefono.trim()) return
     setLoading(true)
     try {
-      const { data } = await supabase.from('clientes').select('*').eq('telefono', busquedaTelefono).maybeSingle()
+      const { data } = await supabase
+        .from('clientes')
+        .select('id, nombre, telefono')
+        .eq('telefono', telefono.trim())
+        .maybeSingle()
+
+      setClienteBuscado(true)
+
       if (data) {
-        setCliente(data)
-        setNombreNuevoCliente(data.nombre)
-        toast.success(<Notification title="Cliente Encontrado" description="Datos cargados correctamente" type="success" />, toastOptions)
+        setNombreCliente(data.nombre)
+        setClienteEncontrado(true)
+        toast.success(
+          <Notification title="Cliente Encontrado" description={data.nombre} type="success" />,
+          toastOptions
+        )
       } else {
-        setCliente({ nuevo: true })
-        setNombreNuevoCliente('')
-        toast.info(<Notification title="Nuevo Registro" description="Cliente no encontrado, ingresa el nombre" type="info" />, toastOptions)
+        setNombreCliente('')
+        setClienteEncontrado(false)
+        toast.info(
+          <Notification title="Cliente Nuevo" description="Ingresa el nombre" type="info" />,
+          toastOptions
+        )
       }
-    } finally { setLoading(false) }
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  // Resetear búsqueda si el teléfono cambia
+  const handleTelefonoChange = (val: string) => {
+    setTelefono(val)
+    setClienteBuscado(false)
+    setClienteEncontrado(false)
+    setNombreCliente('')
   }
 
   const toggleServicio = (srv: any) => {
@@ -103,60 +123,107 @@ export default function NuevoServicioPage() {
     )
   }
 
-  // CORRECCIÓN: parseFloat para evitar NaN que rompe la suma total
   const totalOrden = serviciosSeleccionados.reduce((acc, s) => {
-    const precio = parseFloat(tipoVehiculo === 'carro' ? s.precio_carro : s.precio_moto) || 0
-    return acc + precio
+    return acc + (parseFloat(tipoVehiculo === 'carro' ? s.precio_carro : s.precio_moto) || 0)
   }, 0)
 
+  // ── Crear orden ───────────────────────────────────────────────────────────
   const crearOrden = async () => {
-    if (!placa || serviciosSeleccionados.length === 0 || !empleadoAsignado || !busquedaTelefono) {
-      toast.error(<Notification title="ERROR" description="Faltan datos obligatorios" type="error" />, toastOptions)
+    if (!placa.trim()) {
+      toast.error(<Notification title="ERROR" description="Ingresa la placa" type="error" />, toastOptions)
       return
     }
+    if (serviciosSeleccionados.length === 0) {
+      toast.error(<Notification title="ERROR" description="Selecciona al menos un servicio" type="error" />, toastOptions)
+      return
+    }
+    if (!empleadoAsignado) {
+      toast.error(<Notification title="ERROR" description="Asigna un lavador" type="error" />, toastOptions)
+      return
+    }
+    if (!telefono.trim()) {
+      toast.error(<Notification title="ERROR" description="Ingresa el teléfono del cliente" type="error" />, toastOptions)
+      return
+    }
+    if (!clienteBuscado) {
+      toast.error(<Notification title="ERROR" description="Primero busca el cliente" type="error" />, toastOptions)
+      return
+    }
+
     setLoading(true)
     try {
-      let fId = null
-      const { data: ex } = await supabase.from('clientes').select('id').eq('telefono', busquedaTelefono).maybeSingle()
+      // 1. Buscar si ya existe el cliente
+      const { data: clienteExistente } = await supabase
+        .from('clientes')
+        .select('id')
+        .eq('telefono', telefono.trim())
+        .maybeSingle()
 
-      if (ex) {
-        fId = ex.id
+      let clienteId: string
+
+      if (clienteExistente) {
+        // Cliente ya existe — actualizamos nombre si fue modificado
+        clienteId = clienteExistente.id
+        if (nombreCliente.trim()) {
+          await supabase
+            .from('clientes')
+            .update({ nombre: nombreCliente.trim() })
+            .eq('id', clienteId)
+        }
       } else {
-        // CORRECCIÓN: cedula ya no se llena con el teléfono
-        const { data: n, error: errCliente } = await supabase.from('clientes').insert([{
-          telefono: busquedaTelefono,
-          cedula: '', // vacío, no mezclar con teléfono
-          nombre: nombreNuevoCliente || 'Cliente Nuevo'
-        }]).select().single()
+        // Cliente nuevo — creamos solo con nombre y teléfono
+        const { data: nuevoCliente, error: errCliente } = await supabase
+          .from('clientes')
+          .insert([{
+            telefono: telefono.trim(),
+            nombre: nombreCliente.trim() || 'Cliente Nuevo'
+          }])
+          .select('id')
+          .single()
 
-        if (errCliente) { setLoading(false); return }
-        fId = n?.id
+        if (errCliente || !nuevoCliente) {
+          toast.error(<Notification title="ERROR" description="Error al crear el cliente" type="error" />, toastOptions)
+          setLoading(false)
+          return
+        }
+        clienteId = nuevoCliente.id
       }
 
-      // CORRECCIÓN: fecha local a ISO usando mediodía local para evitar salto de día
-      const { data: ord, error } = await supabase.from('ordenes_servicio').insert([{
-        cliente_id: fId,
-        placa: placa.toUpperCase(),
-        tipo_vehiculo: tipoVehiculo,
-        servicios_ids: serviciosSeleccionados.map(s => s.id),
-        nombres_servicios: serviciosSeleccionados.map(s => s.nombre).join(', '),
-        total: totalOrden,
-        metodo_pago: metodoPago,
-        empleado_id: empleadoAsignado,
-        estado: 'pendiente',
-        creado_en: fechaLocalAISO(fechaServicio) // ← sin desfase UTC
-      }]).select().single()
+      // 2. Crear la orden
+      const { error: errOrden } = await supabase
+        .from('ordenes_servicio')
+        .insert([{
+          cliente_id: clienteId,
+          placa: placa.toUpperCase().trim(),
+          tipo_vehiculo: tipoVehiculo,
+          servicios_ids: serviciosSeleccionados.map(s => s.id),
+          nombres_servicios: serviciosSeleccionados.map(s => s.nombre).join(', '),
+          total: totalOrden,
+          metodo_pago: metodoPago,
+          empleado_id: empleadoAsignado,
+          estado: 'pendiente',
+          creado_en: fechaLocalAISO(fechaServicio)
+        }])
 
-      if (!error && ord) {
+      if (!errOrden) {
         setOrdenFinalizada(true)
-        toast.success(<Notification title="ÉXITO" description="Servicio registrado" type="success" />, toastOptions)
+        toast.success(
+          <Notification title="ÉXITO" description="Servicio registrado" type="success" />,
+          toastOptions
+        )
+      } else {
+        toast.error(<Notification title="ERROR" description={errOrden.message} type="error" />, toastOptions)
       }
     } catch (e) {
       console.error(e)
-    } finally { setLoading(false) }
+    } finally {
+      setLoading(false)
+    }
   }
 
-  const serviciosFiltrados = serviciosDB.filter(s => s.aplica_a === tipoVehiculo || s.aplica_a === 'ambos')
+  const serviciosFiltrados = serviciosDB.filter(
+    s => s.aplica_a === tipoVehiculo || s.aplica_a === 'ambos'
+  )
 
   return (
     <div className="min-h-screen pt-16 lg:pt-0 bg-[#F8FAFC] text-slate-900 font-sans relative">
@@ -181,12 +248,12 @@ export default function NuevoServicioPage() {
 
             {/* 1. VEHÍCULO + PLACA */}
             <section className="flex flex-col sm:flex-row gap-4">
-              <div className="flex gap-3 sm:w-auto">
+              <div className="flex gap-3">
                 {(['carro', 'moto'] as const).map(tipo => (
                   <button
                     key={tipo}
                     onClick={() => { setTipoVehiculo(tipo); setServiciosSeleccionados([]) }}
-                    className={`flex-1 sm:flex-none sm:w-32 py-4 px-4 rounded-[1.5rem] border transition-all flex flex-col items-center justify-center gap-2 ${tipoVehiculo === tipo
+                    className={`flex-1 sm:w-32 py-4 px-4 rounded-[1.5rem] border transition-all flex flex-col items-center justify-center gap-2 ${tipoVehiculo === tipo
                         ? 'bg-white border-gorilla-orange shadow-md'
                         : 'bg-white border-slate-200/60 hover:border-slate-300'
                       }`}
@@ -216,7 +283,9 @@ export default function NuevoServicioPage() {
             {/* 2. CATÁLOGO DE SERVICIOS */}
             <section>
               <div className="flex justify-between items-end mb-5 px-1">
-                <h2 className="text-base sm:text-lg font-black italic uppercase text-slate-800 tracking-tight">Servicios Disponibles</h2>
+                <h2 className="text-base sm:text-lg font-black italic uppercase text-slate-800 tracking-tight">
+                  Servicios Disponibles
+                </h2>
                 <span className="text-[10px] font-bold text-slate-500 uppercase bg-slate-200/50 px-3 py-1 rounded-full">
                   {serviciosFiltrados.length} Opciones
                 </span>
@@ -257,12 +326,11 @@ export default function NuevoServicioPage() {
         </div>
 
         {/* ── DERECHA: PANEL DE PAGO ───────────────────────────────────────── */}
-        {/* En móvil: se muestra debajo. En xl+: fijo a la derecha */}
         <div className="w-full xl:w-[400px] 2xl:w-[450px] bg-[#0E0C15] text-white shadow-2xl z-40 flex flex-col xl:fixed xl:right-0 xl:top-0 xl:bottom-0">
 
           <div className="flex-1 overflow-y-auto p-5 sm:p-6 lg:p-8 flex flex-col gap-6 custom-scrollbar">
 
-            {/* RESUMEN */}
+            {/* RESUMEN DE SERVICIOS */}
             <div className="space-y-3 mt-1 sm:mt-2">
               <div className="flex items-center justify-between border-b border-white/10 pb-3">
                 <div className="flex items-center gap-2 opacity-60">
@@ -272,7 +340,7 @@ export default function NuevoServicioPage() {
                 <span className="text-lg font-black xl:hidden">${totalOrden.toLocaleString('es-CO')}</span>
               </div>
 
-              <div className="max-h-[180px] sm:max-h-[220px] overflow-y-auto pr-1 space-y-2 custom-scrollbar">
+              <div className="max-h-[180px] overflow-y-auto pr-1 space-y-2 custom-scrollbar">
                 {serviciosSeleccionados.length === 0 ? (
                   <div className="py-6 border-2 border-dashed border-white/5 rounded-2xl text-center text-gray-600 font-bold uppercase text-xs">
                     Ningún servicio seleccionado
@@ -281,13 +349,8 @@ export default function NuevoServicioPage() {
                   serviciosSeleccionados.map((s, i) => {
                     const precio = parseFloat(tipoVehiculo === 'carro' ? s.precio_carro : s.precio_moto) || 0
                     return (
-                      <motion.div
-                        layout
-                        initial={{ opacity: 0, x: 20 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        key={i}
-                        className="flex justify-between items-center p-3 bg-white/5 rounded-xl border border-white/5"
-                      >
+                      <motion.div layout initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} key={i}
+                        className="flex justify-between items-center p-3 bg-white/5 rounded-xl border border-white/5">
                         <span className="text-[11px] font-black uppercase tracking-tight text-gray-300 truncate mr-2">{s.nombre}</span>
                         <span className="text-gorilla-orange font-bold text-xs shrink-0">${precio.toLocaleString('es-CO')}</span>
                       </motion.div>
@@ -297,39 +360,52 @@ export default function NuevoServicioPage() {
               </div>
             </div>
 
-            {/* DATOS DEL CLIENTE */}
+            {/* DATOS DEL CLIENTE — solo teléfono */}
             <div className="bg-white/5 p-4 sm:p-5 rounded-[1.5rem] border border-white/10">
               <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-                <User size={14} /> Datos del Cliente
+                <User size={14} /> Cliente
               </label>
-              <div className="flex gap-2 mb-2">
+
+              {/* Campo teléfono + botón buscar */}
+              <div className="flex gap-2 mb-3">
                 <div className="relative flex-1">
-                  <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={16} />
+                  <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
                   <input
-                    placeholder="Teléfono"
+                    placeholder="Número de teléfono"
                     type="tel"
                     className="w-full bg-white/5 border border-white/10 p-3.5 pl-11 rounded-xl outline-none focus:border-gorilla-orange transition-all font-bold text-white placeholder:text-gray-500 text-sm"
-                    value={busquedaTelefono}
-                    onChange={e => setBusquedaTelefono(e.target.value)}
+                    value={telefono}
+                    onChange={e => handleTelefonoChange(e.target.value)}
                     onKeyDown={e => e.key === 'Enter' && buscarCliente()}
                   />
                 </div>
                 <button
                   onClick={buscarCliente}
-                  className="bg-gorilla-orange text-white p-3.5 rounded-xl shadow-lg hover:bg-orange-600 transition-all shrink-0"
+                  disabled={loading || !telefono.trim()}
+                  className="bg-gorilla-orange text-white p-3.5 rounded-xl shadow-lg hover:bg-orange-600 transition-all disabled:opacity-50 shrink-0"
                 >
-                  <Search size={20} />
+                  <Search size={19} />
                 </button>
               </div>
+
+              {/* Campo nombre — aparece después de buscar */}
               <AnimatePresence>
-                {cliente && (
-                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} className="overflow-hidden pt-2">
-                    <input
-                      placeholder="Nombre Completo"
-                      className="w-full bg-white/5 border border-white/10 p-3.5 rounded-xl outline-none font-bold uppercase text-xs focus:border-gorilla-orange text-white placeholder:text-gray-500 transition-all"
-                      value={nombreNuevoCliente}
-                      onChange={e => setNombreNuevoCliente(e.target.value)}
-                    />
+                {clienteBuscado && (
+                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                    <div className="relative">
+                      <User className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" size={15} />
+                      <input
+                        placeholder="Nombre del cliente"
+                        className={`w-full bg-white/5 border p-3.5 pl-11 rounded-xl outline-none font-bold uppercase text-xs focus:border-gorilla-orange text-white placeholder:text-gray-500 transition-all ${clienteEncontrado ? 'border-green-500/40' : 'border-white/10'
+                          }`}
+                        value={nombreCliente}
+                        onChange={e => setNombreCliente(e.target.value)}
+                      />
+                    </div>
+                    {/* Indicador de estado */}
+                    <p className={`text-[9px] font-black uppercase tracking-widest mt-2 ml-1 ${clienteEncontrado ? 'text-green-400' : 'text-blue-400'}`}>
+                      {clienteEncontrado ? '✓ Cliente existente' : '+ Cliente nuevo'}
+                    </p>
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -337,7 +413,9 @@ export default function NuevoServicioPage() {
 
             {/* FECHA */}
             <div className="space-y-2">
-              <label className="text-[10px] font-black text-gray-400 uppercase ml-1 tracking-widest">Fecha del Servicio</label>
+              <label className="text-[10px] font-black text-gray-400 uppercase ml-1 tracking-widest">
+                Fecha del Servicio
+              </label>
               <input
                 type="date"
                 max={getFechaLocal()}
@@ -350,7 +428,9 @@ export default function NuevoServicioPage() {
             {/* LAVADOR Y MÉTODO DE PAGO */}
             <div className="space-y-4 pb-2">
               <div className="space-y-2">
-                <label className="text-[10px] font-black text-gray-400 uppercase ml-1 tracking-widest">Lavador Asignado</label>
+                <label className="text-[10px] font-black text-gray-400 uppercase ml-1 tracking-widest">
+                  Lavador Asignado
+                </label>
                 <select
                   className="w-full bg-white/5 border border-white/10 p-3.5 rounded-xl text-white font-bold text-sm outline-none appearance-none cursor-pointer hover:bg-white/10 transition-all"
                   value={empleadoAsignado}
@@ -393,7 +473,7 @@ export default function NuevoServicioPage() {
               disabled={loading}
               className="w-full bg-gorilla-orange hover:bg-orange-600 text-white py-4 sm:py-5 rounded-2xl font-black text-base sm:text-lg italic uppercase tracking-widest shadow-[0_0_20px_rgba(249,115,22,0.3)] transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3"
             >
-              {loading ? 'Procesando...' : <><span>REGISTRAR VENTA</span> <CheckCircle2 size={22} /></>}
+              {loading ? 'Procesando...' : <><span>REGISTRAR VENTA</span><CheckCircle2 size={22} /></>}
             </button>
           </div>
         </div>
@@ -404,11 +484,8 @@ export default function NuevoServicioPage() {
       <AnimatePresence>
         {ordenFinalizada && (
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-slate-900/80 backdrop-blur-md">
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              className="bg-white p-10 sm:p-12 rounded-[2.5rem] text-center max-w-sm w-full shadow-2xl"
-            >
+            <motion.div initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+              className="bg-white p-10 sm:p-12 rounded-[2.5rem] text-center max-w-sm w-full shadow-2xl">
               <div className="w-20 h-20 bg-green-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl shadow-green-200">
                 <Check size={40} className="text-white" strokeWidth={4} />
               </div>
