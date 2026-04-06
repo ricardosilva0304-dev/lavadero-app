@@ -8,6 +8,7 @@ import {
   Check, Save
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { type Rol, puedeGestionarInventario } from '@/utils/roles'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,6 +17,7 @@ export default function InventarioPage() {
   const [productos, setProductos] = useState<any[]>([])
   const [activeTab, setActiveTab] = useState<'venta' | 'gestion'>('venta')
   const [busqueda, setBusqueda] = useState('')
+  const [userRol, setUserRol] = useState<Rol>('empleado')
 
   const [carrito, setCarrito] = useState<any[]>([])
   const [metodoPago, setMetodoPago] = useState<'efectivo' | 'transferencia'>('efectivo')
@@ -23,6 +25,13 @@ export default function InventarioPage() {
 
   const [form, setForm] = useState({ id: '', nombre: '', categoria: 'bebida', precio_venta: 0, stock: 0 })
   const [isEditing, setIsEditing] = useState(false)
+
+  useEffect(() => {
+    const userData = sessionStorage.getItem('gorilla_user')
+    if (userData) setUserRol(JSON.parse(userData).rol ?? 'empleado')
+  }, [])
+
+  const puedeGestion = puedeGestionarInventario(userRol)
 
   useEffect(() => {
     fetchProductos()
@@ -129,7 +138,9 @@ export default function InventarioPage() {
 
         <div className="flex bg-slate-200/50 p-1.5 rounded-[1.5rem] shadow-sm border border-slate-200 w-full sm:w-auto">
           <button onClick={() => setActiveTab('venta')} className={`flex-1 sm:flex-none px-6 sm:px-8 py-3 rounded-2xl font-black text-xs tracking-widest transition-all ${activeTab === 'venta' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>VENTA</button>
-          <button onClick={() => setActiveTab('gestion')} className={`flex-1 sm:flex-none px-6 sm:px-8 py-3 rounded-2xl font-black text-xs tracking-widest transition-all ${activeTab === 'gestion' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>GESTIÓN</button>
+          {puedeGestion && (
+            <button onClick={() => setActiveTab('gestion')} className={`flex-1 sm:flex-none px-6 sm:px-8 py-3 rounded-2xl font-black text-xs tracking-widest transition-all ${activeTab === 'gestion' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}>GESTIÓN</button>
+          )}
         </div>
       </header>
 
@@ -166,8 +177,8 @@ export default function InventarioPage() {
                         onClick={() => agregarAlCarrito(p)}
                         disabled={sinStock}
                         className={`group relative p-4 sm:p-5 rounded-[1.5rem] border transition-all flex flex-col items-start text-left gap-3 bg-white ${sinStock
-                            ? 'opacity-60 grayscale border-slate-200 cursor-not-allowed'
-                            : 'border-slate-200/60 hover:border-gorilla-orange/50 hover:shadow-md hover:shadow-orange-100'
+                          ? 'opacity-60 grayscale border-slate-200 cursor-not-allowed'
+                          : 'border-slate-200/60 hover:border-gorilla-orange/50 hover:shadow-md hover:shadow-orange-100'
                           }`}
                       >
                         <div className="flex justify-between items-start w-full">
@@ -175,8 +186,8 @@ export default function InventarioPage() {
                             {p.categoria === 'bebida' ? <Coffee size={20} /> : <Utensils size={20} />}
                           </div>
                           <span className={`px-2 py-1 rounded-md text-[9px] font-black tracking-widest uppercase border ${sinStock ? 'bg-slate-100 border-slate-200 text-slate-500'
-                              : alertaStock ? 'bg-red-50 border-red-100 text-red-500'
-                                : 'bg-green-50 border-green-100 text-green-600'
+                            : alertaStock ? 'bg-red-50 border-red-100 text-red-500'
+                              : 'bg-green-50 border-green-100 text-green-600'
                             }`}>
                             {p.stock}
                           </span>
@@ -244,8 +255,8 @@ export default function InventarioPage() {
                       {(['efectivo', 'transferencia'] as const).map(m => (
                         <button key={m} onClick={() => setMetodoPago(m)}
                           className={`py-3 rounded-xl font-black text-[10px] tracking-widest border-2 transition-all flex items-center justify-center gap-1.5 ${metodoPago === m
-                              ? m === 'efectivo' ? 'bg-green-50 border-green-500 text-green-600' : 'bg-blue-50 border-blue-500 text-blue-600'
-                              : 'bg-white border-slate-200 text-slate-400 hover:bg-slate-50'
+                            ? m === 'efectivo' ? 'bg-green-50 border-green-500 text-green-600' : 'bg-blue-50 border-blue-500 text-blue-600'
+                            : 'bg-white border-slate-200 text-slate-400 hover:bg-slate-50'
                             }`}>
                           {metodoPago === m && <Check size={13} strokeWidth={3} />}
                           {m === 'efectivo' ? 'EFECTIVO' : 'TRANSF.'}

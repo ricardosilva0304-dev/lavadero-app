@@ -22,7 +22,15 @@ export default function MonitoreoPage() {
 
   const fetchStatus = async () => {
     // 1. Obtener fecha de hoy en formato YYYY-MM-DD
-    const hoy = new Date().toISOString().split('T')[0];
+    // Fecha de hoy en Colombia (UTC-5)
+    const colNow = new Date(new Date().getTime() - 5 * 60 * 60 * 1000)
+    const y = colNow.getUTCFullYear()
+    const m = String(colNow.getUTCMonth() + 1).padStart(2, '0')
+    const d = String(colNow.getUTCDate()).padStart(2, '0')
+    const hoy = `${y}-${m}-${d}`
+    // Rango del día Colombia: 00:00 COL = 05:00 UTC, 23:59 COL = 04:59 UTC siguiente
+    const inicioDia = new Date(Date.UTC(Number(y), Number(m) - 1, Number(d), 5, 0, 0)).toISOString()
+    const finDia = new Date(Date.UTC(Number(y), Number(m) - 1, Number(d) + 1, 4, 59, 59)).toISOString()
 
     // 2. Obtener todos los empleados
     const { data: empleados } = await supabase.from('perfiles').select('*').eq('rol', 'empleado')
@@ -32,8 +40,8 @@ export default function MonitoreoPage() {
     const { data: ordenes } = await supabase
       .from('ordenes_servicio')
       .select('*')
-      .gte('creado_en', `${hoy}T00:00:00`)
-      .lte('creado_en', `${hoy}T23:59:59`)
+      .gte('creado_en', inicioDia)
+      .lte('creado_en', finDia)
 
     if (empleados) {
       const resumen = empleados.map(emp => {

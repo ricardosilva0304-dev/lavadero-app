@@ -18,16 +18,18 @@ export default function ResumenPage() {
   const [loading, setLoading] = useState(true)
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
 
-  // ── Utilidad: fecha local YYYY-MM-DD sin desfase UTC ──────────────────────
+  // ── Fecha Colombia YYYY-MM-DD ──────────────────────────────────────────────
   const toLocalDate = (d: Date) => {
+    // Ajuste a UTC-5 Colombia
+    const col = new Date(d.getTime() - 5 * 60 * 60 * 1000)
     const pad = (n: number) => String(n).padStart(2, '0')
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
+    return `${col.getUTCFullYear()}-${pad(col.getUTCMonth() + 1)}-${pad(col.getUTCDate())}`
   }
 
   const fetchResumen = useCallback(async () => {
     setLoading(true)
 
-    const hoy = new Date()
+    const hoy = new Date(new Date().getTime() - 5 * 60 * 60 * 1000)
     let startDate = new Date(hoy)
     let endDate = new Date(hoy)
 

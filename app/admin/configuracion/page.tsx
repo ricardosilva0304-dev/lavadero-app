@@ -1,16 +1,20 @@
 'use client'
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 import {
-  Settings, Users, Car, Bike, Trash2, Plus, Save, X, Edit3, Clock, Check, Info, UserPlus, DollarSign, Layers, ArrowRight
+  Settings, Users, Car, Bike, Trash2, Plus, Save, X, Edit3, Clock, Check, Info, UserPlus, DollarSign, Layers, ArrowRight, ShieldOff
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { puedeVerConfiguracion, ETIQUETA_ROL } from '@/utils/roles'
 
 export const dynamic = 'force-dynamic'
 
 export default function ConfiguracionPage() {
   const supabase = createClient()
+  const router = useRouter()
   const [loading, setLoading] = useState(true)
+  const [accesoDenegado, setAccesoDenegado] = useState(false)
 
   // --- DATOS ---
   const [servicios, setServicios] = useState<any[]>([])
@@ -29,6 +33,13 @@ export default function ConfiguracionPage() {
   const [formUsuario, setFormUsuario] = useState({ id: null, nombre: '', cedula: '', telefono: '', rol: 'empleado' })
 
   useEffect(() => {
+    const userData = sessionStorage.getItem('gorilla_user')
+    const rol = userData ? JSON.parse(userData).rol : null
+    if (!puedeVerConfiguracion(rol)) {
+      setAccesoDenegado(true)
+      setLoading(false)
+      return
+    }
     fetchData()
   }, [])
 
@@ -121,6 +132,30 @@ export default function ConfiguracionPage() {
     fetchData()
   }
 
+  // ---- PANTALLA DE ACCESO DENEGADO ----
+  if (accesoDenegado) {
+    return (
+      <div className="min-h-screen bg-[#F8FAFC] flex flex-col items-center justify-center gap-6 px-4">
+        <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }}
+          className="bg-white border border-red-100 rounded-[2.5rem] p-10 max-w-md w-full text-center shadow-xl shadow-red-50/50">
+          <div className="w-16 h-16 bg-red-50 rounded-2xl flex items-center justify-center mx-auto mb-6">
+            <ShieldOff className="text-red-400" size={32} />
+          </div>
+          <h2 className="text-2xl font-black italic uppercase tracking-tighter text-slate-900 mb-2">
+            Acceso <span className="text-red-500">Restringido</span>
+          </h2>
+          <p className="text-slate-500 text-sm font-bold uppercase tracking-widest mb-8">
+            Solo el administrador puede acceder a Configuración.
+          </p>
+          <button onClick={() => router.back()}
+            className="bg-slate-900 text-white px-8 py-4 rounded-xl font-black uppercase tracking-widest text-xs active:scale-95 transition-all">
+            Volver
+          </button>
+        </motion.div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen pt-24 lg:pt-10 bg-[#F8FAFC] text-slate-900 px-4 md:px-8 lg:px-10 pb-32 overflow-x-hidden">
 
@@ -210,12 +245,15 @@ export default function ConfiguracionPage() {
             {usuarios.map(u => (
               <div key={u.id} className="bg-slate-50 border border-slate-100 p-4 rounded-[1.5rem] flex items-center justify-between group hover:border-slate-300 transition-colors">
                 <div className="flex items-center gap-4 overflow-hidden pr-2">
-                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-black text-sm shrink-0 ${u.rol === 'administrador' ? 'bg-orange-100 text-gorilla-orange' : 'bg-purple-100 text-gorilla-purple'}`}>
+                  <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-black text-sm shrink-0 ${u.rol === 'coordinador' ? 'bg-orange-100 text-gorilla-orange' :
+                      u.rol === 'vendedor' ? 'bg-green-100 text-green-600' :
+                        'bg-purple-100 text-gorilla-purple'
+                    }`}>
                     {u.nombre[0].toUpperCase()}
                   </div>
                   <div className="truncate">
                     <h3 className="font-black text-sm uppercase italic text-slate-800 leading-tight truncate">{u.nombre}</h3>
-                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1">CC: {u.cedula} • {u.rol}</p>
+                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1">CC: {u.cedula} • {ETIQUETA_ROL[u.rol as keyof typeof ETIQUETA_ROL] ?? u.rol}</p>
                   </div>
                 </div>
                 <div className="flex gap-1 shrink-0">
@@ -307,8 +345,15 @@ export default function ConfiguracionPage() {
                 <div className="space-y-1.5">
                   <label className="text-[9px] font-black text-slate-400 uppercase ml-1 tracking-widest">Rol del Sistema</label>
                   <select className="w-full bg-slate-50 border border-slate-200/60 p-3.5 rounded-xl outline-none font-bold text-sm" value={formUsuario.rol} onChange={(e: any) => setFormUsuario({ ...formUsuario, rol: e.target.value })}>
-                    <option value="empleado">Operador Lavado</option><option value="administrador">Administrador</option>
+                    <option value="empleado">Operador Lavado</option>
+                    <option value="vendedor">Vendedor</option>
+                    <option value="coordinador">Coordinador</option>
                   </select>
+                  <p className="text-[9px] text-slate-400 font-bold ml-1 mt-1 leading-relaxed">
+                    {formUsuario.rol === 'empleado' && '→ Panel de tareas únicamente'}
+                    {formUsuario.rol === 'vendedor' && '→ Inventario (ventas), Nuevo Servicio y Parqueadero'}
+                    {formUsuario.rol === 'coordinador' && '→ Acceso total al sistema'}
+                  </p>
                 </div>
                 <button onClick={guardarUsuario} className="w-full bg-gorilla-purple text-white p-4 rounded-xl font-black uppercase tracking-widest mt-4 flex items-center justify-center gap-2 shadow-lg shadow-purple-200 active:scale-95 transition-all">
                   Guardar <Check size={18} />

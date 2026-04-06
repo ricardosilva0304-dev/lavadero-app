@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { Search, FileText, User, Car, Tag, Trash2, Calendar, Phone } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { type Rol, puedeCRUD } from '@/utils/roles'
 
 export const dynamic = 'force-dynamic'
 
@@ -12,6 +13,13 @@ export default function HistorialPage() {
   const [busqueda, setBusqueda] = useState('')
   const [loading, setLoading] = useState(true)
   const [filtroPago, setFiltroPago] = useState<'todos' | 'efectivo' | 'transferencia'>('todos')
+  const [puedeEliminar, setPuedeEliminar] = useState(false)
+
+  useEffect(() => {
+    const userData = sessionStorage.getItem('gorilla_user')
+    const rol: Rol = userData ? JSON.parse(userData).rol : 'empleado'
+    setPuedeEliminar(puedeCRUD(rol))
+  }, [])
 
   const fetchHistorial = useCallback(async () => {
     setLoading(true)
@@ -56,25 +64,22 @@ export default function HistorialPage() {
 
   const agruparPorFecha = (lista: any[]) => {
     const grupos: { [key: string]: any[] } = {}
-    const hoy = new Date()
-    const ayer = new Date(); ayer.setDate(hoy.getDate() - 1)
-    const fmt = (d: Date) => d.toLocaleDateString('es-CO')
-    const hoyStr = fmt(hoy), ayerStr = fmt(ayer)
+    // Hoy y ayer en Colombia (UTC-5)
+    const offset = -5 * 60 * 60 * 1000
+    const colNow = new Date(Date.now() + offset)
+    const colAyer = new Date(colNow.getTime() - 86400000)
+    const fmt = (d: Date) => `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`
+    const hoyStr = fmt(colNow)
+    const ayerStr = fmt(colAyer)
 
     lista.forEach(o => {
-      let dateObj: Date
-      if (o.creado_en.includes('T00:00:00') || o.creado_en.includes(' 00:00:00')) {
-        const pura = o.creado_en.split('T')[0].split(' ')[0]
-        dateObj = new Date(`${pura}T12:00:00`)
-      } else {
-        dateObj = new Date(o.creado_en)
-      }
-      const recordStr = fmt(dateObj)
+      const colFecha = new Date(new Date(o.creado_en).getTime() + offset)
+      const recordStr = fmt(colFecha)
       const nombreGrupo =
-        recordStr === hoyStr ? 'HOY' :
-          recordStr === ayerStr ? 'AYER' :
-            new Intl.DateTimeFormat('es-CO', { day: '2-digit', month: 'long', year: 'numeric' }).format(dateObj).toUpperCase()
-
+        recordStr === hoyStr  ? 'HOY' :
+        recordStr === ayerStr ? 'AYER' :
+        new Intl.DateTimeFormat('es-CO', { day: '2-digit', month: 'long', year: 'numeric' })
+          .format(colFecha).toUpperCase()
       if (!grupos[nombreGrupo]) grupos[nombreGrupo] = []
       grupos[nombreGrupo].push(o)
     })
@@ -201,10 +206,12 @@ export default function HistorialPage() {
                             <span className="text-xl sm:text-2xl font-black text-gorilla-orange tracking-tighter leading-none">
                               ${(parseFloat(o.total) || 0).toLocaleString('es-CO')}
                             </span>
-                            <button onClick={() => eliminarOrden(o.id)}
-                              className="p-2.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all shrink-0">
-                              <Trash2 size={17} />
-                            </button>
+                            {puedeEliminar && (
+                              <button onClick={() => eliminarOrden(o.id)}
+                                className="p-2.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all shrink-0">
+                                <Trash2 size={17} />
+                              </button>
+                            )}
                           </div>
                         </div>
                       </motion.div>

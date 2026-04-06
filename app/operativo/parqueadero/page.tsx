@@ -111,7 +111,7 @@ export default function ParqueaderoPage() {
       .from('parqueadero_registros')
       .update({
         estado: 'finalizado',
-        hora_salida: new Date().toISOString(),
+        hora_salida: new Date().toISOString(), // UTC real — se convierte a Colombia al mostrar
         total_pagar: total,
         metodo_pago: pagoSeleccionado,
         tipo_tarifa: tarifaSeleccionada

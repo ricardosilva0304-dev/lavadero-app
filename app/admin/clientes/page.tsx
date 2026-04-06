@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { Search, Phone, Edit, Trash2, Users, Star, History, User, ChevronRight, X } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { type Rol, puedeCRUD } from '@/utils/roles'
 
 export default function BaseClientesPage() {
   const supabase = createClient()
@@ -10,6 +11,13 @@ export default function BaseClientesPage() {
   const [busqueda, setBusqueda] = useState('')
   const [loading, setLoading] = useState(true)
   const [editando, setEditando] = useState<any>(null)
+  const [puedeEditar, setPuedeEditar] = useState(false)
+
+  useEffect(() => {
+    const userData = sessionStorage.getItem('gorilla_user')
+    const rol: Rol = userData ? JSON.parse(userData).rol : 'empleado'
+    setPuedeEditar(puedeCRUD(rol))
+  }, [])
 
   const fetchClientes = useCallback(async () => {
     setLoading(true)
@@ -129,7 +137,7 @@ export default function BaseClientesPage() {
                 return (
                   <motion.div layout initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} key={c.id}
                     className={`bg-white border p-5 sm:p-6 rounded-[1.5rem] transition-all group relative flex flex-col justify-between ${esVIP ? 'border-orange-200 shadow-md shadow-orange-100/50 hover:border-gorilla-orange/50'
-                        : 'border-slate-200/60 shadow-sm hover:shadow-md hover:border-gorilla-purple/40'
+                      : 'border-slate-200/60 shadow-sm hover:shadow-md hover:border-gorilla-purple/40'
                       }`}>
 
                     {esVIP && (
@@ -173,14 +181,18 @@ export default function BaseClientesPage() {
                     </div>
 
                     <div className="flex gap-2">
-                      <button onClick={() => setEditando(c)}
-                        className="flex-1 bg-slate-50 hover:bg-gorilla-purple hover:text-white p-3 rounded-xl flex items-center justify-center gap-2 font-black transition-all text-[10px] uppercase tracking-widest border border-slate-200 hover:border-gorilla-purple text-slate-500">
-                        <Edit size={13} /> Editar
-                      </button>
-                      <button onClick={() => eliminarCliente(c.id)}
-                        className="w-11 flex items-center justify-center bg-red-50 text-red-500 hover:bg-red-500 hover:text-white rounded-xl transition-all border border-red-100 hover:border-red-500">
-                        <Trash2 size={15} />
-                      </button>
+                      {puedeEditar && (
+                        <button onClick={() => setEditando(c)}
+                          className="flex-1 bg-slate-50 hover:bg-gorilla-purple hover:text-white p-3 rounded-xl flex items-center justify-center gap-2 font-black transition-all text-[10px] uppercase tracking-widest border border-slate-200 hover:border-gorilla-purple text-slate-500">
+                          <Edit size={13} /> Editar
+                        </button>
+                      )}
+                      {puedeEditar && (
+                        <button onClick={() => eliminarCliente(c.id)}
+                          className="w-11 flex items-center justify-center bg-red-50 text-red-500 hover:bg-red-500 hover:text-white rounded-xl transition-all border border-red-100 hover:border-red-500">
+                          <Trash2 size={15} />
+                        </button>
+                      )}
                     </div>
                   </motion.div>
                 )
