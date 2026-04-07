@@ -45,12 +45,19 @@ export default function OperativoPage() {
 
     const channel = supabase
       .channel('cambios_operativos')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'ordenes_servicio' }, () => {
-        fetchMisOrdenes(u.cedula, true)
+      .on('postgres_changes',
+        { event: '*', schema: 'public', table: 'ordenes_servicio' },
+        (payload) => {
+          // ← Usar u.cedula directamente del closure, no del state
+          fetchMisOrdenes(u.cedula, true)
+        }
+      )
+      .subscribe((status) => {
+        console.log('Realtime status:', status) // Para verificar que conecta
       })
-      .subscribe()
+
     return () => { supabase.removeChannel(channel) }
-  }, [])
+  }, []) // ← Esto está bien, solo al montar
 
   const iniciarServicio = async (id: string) => {
     setOrdenes(prev => prev.map(o => o.id === id ? { ...o, estado: 'en_proceso' } : o))
@@ -140,8 +147,8 @@ export default function OperativoPage() {
                         <div className="text-right">
                           <p className="text-2xl sm:text-3xl font-black tracking-tighter uppercase">{o.placa}</p>
                           <span className={`text-[9px] font-black px-2.5 py-1 rounded-lg uppercase tracking-widest ${o.estado === 'pendiente' ? 'bg-yellow-50 text-yellow-600' :
-                              o.estado === 'en_proceso' ? 'bg-blue-50 text-blue-600' :
-                                'bg-green-50 text-green-600'
+                            o.estado === 'en_proceso' ? 'bg-blue-50 text-blue-600' :
+                              'bg-green-50 text-green-600'
                             }`}>
                             {o.estado === 'pendiente' ? '⏳ En espera' :
                               o.estado === 'en_proceso' ? '🔄 Lavando' :
