@@ -51,7 +51,9 @@ export default function ResumenPage() {
     const [lav, par, inv] = await Promise.all([
       supabase.from('ordenes_servicio')
         .select('total, metodo_pago')
-        .gte('creado_en', inicioISO).lte('creado_en', finISO),
+        .eq('estado', 'cobrado')  // ← esto
+        .gte('creado_en', inicioISO)
+        .lte('creado_en', finISO),
       supabase.from('parqueadero_registros')
         .select('total_pagar, metodo_pago')
         .eq('estado', 'finalizado')
