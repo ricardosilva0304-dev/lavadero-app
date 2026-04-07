@@ -32,10 +32,12 @@ export default function LoginPage() {
                 rol: data.rol
             }))
 
-            if (data.rol === 'administrador') {
+            if (data.rol === 'coordinador') {
                 router.push('/admin/resumen')
+            } else if (data.rol === 'vendedor') {
+                router.push('/operativo/nuevo-servicio')
             } else {
-                router.push('/operativo') // <--- Esta debe ser su casa
+                router.push('/operativo') // empleado → panel de tareas
             }
         } else {
             setError('Cédula no registrada. Contacta al admin.')

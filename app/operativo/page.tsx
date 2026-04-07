@@ -45,6 +45,11 @@ export default function OperativoPage() {
     const userData = sessionStorage.getItem('gorilla_user')
     if (!userData) { router.push('/login'); return }
     const u = JSON.parse(userData)
+
+    // Redirigir si el rol no es empleado
+    if (u.rol === 'coordinador') { router.push('/admin/resumen'); return }
+    if (u.rol === 'vendedor') { router.push('/operativo/nuevo-servicio'); return }
+
     setUser(u)
     fetchMisOrdenes(u.cedula)
 
@@ -273,8 +278,8 @@ export default function OperativoPage() {
                 {(['efectivo', 'transferencia'] as const).map(m => (
                   <button key={m} onClick={() => setMetodoPago(m)}
                     className={`py-4 rounded-xl font-black text-[11px] tracking-widest border-2 transition-all flex flex-col items-center gap-1.5 ${metodoPago === m
-                        ? m === 'efectivo' ? 'bg-green-500 border-green-500 text-white' : 'bg-blue-600 border-blue-600 text-white'
-                        : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
+                      ? m === 'efectivo' ? 'bg-green-500 border-green-500 text-white' : 'bg-blue-600 border-blue-600 text-white'
+                      : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
                       }`}>
                     {m === 'efectivo' ? <DollarSign size={18} /> : <CreditCard size={18} />}
                     {m === 'efectivo' ? 'EFECTIVO' : 'TRANSF.'}
