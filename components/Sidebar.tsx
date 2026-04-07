@@ -5,14 +5,14 @@ import { usePathname, useRouter } from 'next/navigation'
 import Image from 'next/image'
 import {
   Settings, Clock, Users, Package, LogOut, Menu, X, PlusCircle,
-  ListChecks, Activity, History, BarChart3, LayoutDashboard
+  ListChecks, Activity, History, BarChart3, LayoutDashboard, Scissors
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { type Rol, MENU_POR_ROL, ETIQUETA_ROL, COLOR_ROL } from '@/utils/roles'
 
 const ICONOS: Record<string, React.ElementType> = {
   Settings, Clock, Users, Package, PlusCircle,
-  ListChecks, Activity, History, BarChart3, LayoutDashboard,
+  ListChecks, Activity, History, BarChart3, LayoutDashboard, Scissors,
 }
 
 export default function Sidebar() {
@@ -91,8 +91,8 @@ export default function Sidebar() {
               return (
                 <Link key={item.href} href={item.href} onClick={() => setIsOpen(false)}
                   className={`flex items-center gap-4 px-5 py-4 rounded-2xl font-black text-[11px] uppercase tracking-widest transition-all ${isActive
-                      ? item.color === 'orange' ? 'bg-gorilla-orange text-white' : 'bg-gorilla-purple text-white'
-                      : 'text-gray-500 hover:text-white'
+                    ? item.color === 'orange' ? 'bg-gorilla-orange text-white' : 'bg-gorilla-purple text-white'
+                    : 'text-gray-500 hover:text-white'
                     }`}
                 >
                   <Icon size={18} /> {item.label}

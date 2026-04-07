@@ -25,6 +25,7 @@ export const MENU_POR_ROL: Record<Rol, { label: string; href: string; icon: stri
         { label: 'Parqueadero', href: '/operativo/parqueadero', icon: 'Clock', color: 'orange' },
         { label: 'Inventario', href: '/admin/inventario', icon: 'Package', color: 'purple' },
         { label: 'Clientes', href: '/admin/clientes', icon: 'Users', color: 'purple' },
+        { label: 'Servicios', href: '/admin/servicios', icon: 'Scissors', color: 'purple' },
         { label: 'Reportes', href: '/admin/reportes', icon: 'BarChart3', color: 'purple' },
         { label: 'Configuración', href: '/admin/configuracion', icon: 'Settings', color: 'purple' },
     ],
