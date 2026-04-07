@@ -122,7 +122,7 @@ export default function NuevoServicioPage() {
         clienteId = nuevo.id
       }
 
-      // 2. Crear orden — SIN metodo_pago ni total definitivo aún (se cobra al finalizar)
+      // 2. Crear orden — sin metodo_pago, se asigna al cobrar
       const { error: errO } = await supabase.from('ordenes_servicio').insert([{
         cliente_id: clienteId,
         placa: placa.toUpperCase().trim(),
@@ -130,7 +130,6 @@ export default function NuevoServicioPage() {
         servicios_ids: serviciosSeleccionados.map(s => s.id),
         nombres_servicios: serviciosSeleccionados.map(s => s.nombre).join(', '),
         total: totalOrden,
-        metodo_pago: 'pendiente',   // se actualiza al cobrar
         empleado_id: empleadoAsignado,
         estado: 'pendiente',
         creado_en: ahoraISO(),
@@ -196,8 +195,8 @@ export default function NuevoServicioPage() {
                     key={tipo}
                     onClick={() => { setTipoVehiculo(tipo); setServiciosSeleccionados([]) }}
                     className={`w-28 sm:w-32 py-4 px-3 rounded-2xl border-2 transition-all flex flex-col items-center justify-center gap-2 ${tipoVehiculo === tipo
-                        ? 'bg-white border-gorilla-orange shadow-md shadow-orange-100'
-                        : 'bg-white border-slate-200 hover:border-slate-300'
+                      ? 'bg-white border-gorilla-orange shadow-md shadow-orange-100'
+                      : 'bg-white border-slate-200 hover:border-slate-300'
                       }`}
                   >
                     {tipo === 'carro'
