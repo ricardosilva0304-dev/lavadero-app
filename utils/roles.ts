@@ -29,9 +29,11 @@ export const MENU_POR_ROL: Record<Rol, { label: string; href: string; icon: stri
         { label: 'Configuración', href: '/admin/configuracion', icon: 'Settings', color: 'purple' },
     ],
     vendedor: [
-        { label: 'Inventario', href: '/admin/inventario', icon: 'Package', color: 'orange' },
+        { label: 'Resumen', href: '/admin/resumen', icon: 'LayoutDashboard', color: 'orange' },
+        { label: 'Monitoreo', href: '/admin/monitoreo', icon: 'Activity', color: 'orange' },
         { label: 'Nuevo Servicio', href: '/operativo/nuevo-servicio', icon: 'PlusCircle', color: 'orange' },
         { label: 'Parqueadero', href: '/operativo/parqueadero', icon: 'Clock', color: 'orange' },
+        { label: 'Inventario', href: '/admin/inventario', icon: 'Package', color: 'purple' },
     ],
     empleado: [
         { label: 'Panel de Tareas', href: '/operativo', icon: 'ListChecks', color: 'orange' },
