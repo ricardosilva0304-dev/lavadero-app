@@ -7,11 +7,13 @@ import {
   X, CheckCircle2, Calendar, Check, Zap
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useRouter } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
 
 export default function ParqueaderoPage() {
   const supabase = createClient()
+  const router = useRouter()
   const [registros, setRegistros] = useState<any[]>([])
   const [configPrecios, setConfigPrecios] = useState<any[]>([])
   const [vehiculoSalida, setVehiculoSalida] = useState<any>(null)
@@ -20,9 +22,8 @@ export default function ParqueaderoPage() {
   const [form, setForm] = useState({ nombre: '', celular: '', placa: '', tipo: 'carro' })
   const [loadingIngreso, setLoadingIngreso] = useState(false)
   const [loadingRegistros, setLoadingRegistros] = useState(true)
+  const [loadingSalida, setLoadingSalida] = useState(false)
 
-  // Usamos useRef para la función de fetch para que el canal siempre
-  // tenga acceso a la versión más reciente sin recrearse
   const fetchRegistrosRef = useRef<(() => Promise<void>) | null>(null)
 
   const fetchRegistros = async () => {
@@ -43,6 +44,11 @@ export default function ParqueaderoPage() {
     const { data, error } = await supabase.from('config_parqueadero').select('*')
     if (!error) setConfigPrecios(data || [])
   }
+
+  // Auth guard
+  useEffect(() => {
+    if (!sessionStorage.getItem('gorilla_user')) router.push('/login')
+  }, [router])
 
   // Carga inicial — solo una vez
   useEffect(() => {
@@ -105,13 +111,14 @@ export default function ParqueaderoPage() {
   }
 
   const confirmarSalida = async () => {
-    if (!vehiculoSalida?.id) return
+    if (!vehiculoSalida?.id || loadingSalida) return
+    setLoadingSalida(true)
     const total = obtenerPrecio(vehiculoSalida.tipo_vehiculo, tarifaSeleccionada)
     const { error } = await supabase
       .from('parqueadero_registros')
       .update({
         estado: 'finalizado',
-        hora_salida: new Date().toISOString(), // UTC real — se convierte a Colombia al mostrar
+        hora_salida: new Date().toISOString(),
         total_pagar: total,
         metodo_pago: pagoSeleccionado,
         tipo_tarifa: tarifaSeleccionada
@@ -125,12 +132,14 @@ export default function ParqueaderoPage() {
     } else {
       console.error('Error al confirmar salida:', error)
     }
+    setLoadingSalida(false)
   }
 
   const formatearHora = (fecha: string) => {
     try {
       return new Intl.DateTimeFormat('es-CO', {
-        hour: '2-digit', minute: '2-digit', hour12: true
+        hour: '2-digit', minute: '2-digit', hour12: true,
+        timeZone: 'America/Bogota'
       }).format(new Date(fecha))
     } catch { return '--:--' }
   }
@@ -330,8 +339,8 @@ export default function ParqueaderoPage() {
                   {(['dia', 'mes'] as const).map(t => (
                     <button key={t} type="button" onClick={() => setTarifaSeleccionada(t)}
                       className={`py-4 rounded-xl font-black uppercase text-[10px] border-2 transition-all tracking-widest flex items-center justify-center gap-2 ${tarifaSeleccionada === t
-                          ? 'border-gorilla-orange bg-orange-50 text-gorilla-orange'
-                          : 'border-slate-100 bg-white text-slate-400 hover:border-slate-200 hover:bg-slate-50'
+                        ? 'border-gorilla-orange bg-orange-50 text-gorilla-orange'
+                        : 'border-slate-100 bg-white text-slate-400 hover:border-slate-200 hover:bg-slate-50'
                         }`}>
                       {tarifaSeleccionada === t && <Check size={14} strokeWidth={3} />}
                       {t === 'dia' ? 'Cobrar Día' : 'Cobrar Mes'}
@@ -360,9 +369,12 @@ export default function ParqueaderoPage() {
                 </div>
               </div>
 
-              <button onClick={confirmarSalida}
-                className="w-full bg-slate-900 hover:bg-black text-white p-5 rounded-2xl font-black uppercase tracking-widest text-sm shadow-xl flex items-center justify-center gap-3 transition-all active:scale-95">
-                Cerrar Operación <CheckCircle2 size={20} />
+              <button onClick={confirmarSalida} disabled={loadingSalida}
+                className="w-full bg-slate-900 hover:bg-black disabled:opacity-60 text-white p-5 rounded-2xl font-black uppercase tracking-widest text-sm shadow-xl flex items-center justify-center gap-3 transition-all active:scale-95">
+                {loadingSalida
+                  ? <><div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Procesando...</>
+                  : <>Cerrar Operación <CheckCircle2 size={20} /></>
+                }
               </button>
 
               {configPrecios.length === 0 && (

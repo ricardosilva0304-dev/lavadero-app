@@ -9,12 +9,14 @@ import {
   DollarSign, Check, X, AlertCircle
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { rangoHoyCol, isoAHoraCol } from '@/utils/colombia'
+import { rangoHoyCol, isoAHoraCol, ahoraCol } from '@/utils/colombia'
+import { useRouter } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
 
 export default function MonitoreoPage() {
   const supabase = createClient()
+  const router = useRouter()
   const [empleadosData, setEmpleadosData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [expandido, setExpandido] = useState<string | null>(null)
@@ -32,18 +34,21 @@ export default function MonitoreoPage() {
   }, [])
 
   const horaCol = () => {
-    const col = new Date(ahora.getTime() - 5 * 60 * 60 * 1000)
-    const h = String(col.getUTCHours()).padStart(2, '0')
-    const m = String(col.getUTCMinutes()).padStart(2, '0')
-    const s = String(col.getUTCSeconds()).padStart(2, '0')
+    // ahoraCol() devuelve un Date ajustado a UTC-5, leemos sus componentes UTC
+    const col = ahoraCol()
+    // Actualizamos con el tick del reloj
+    const base = new Date(ahora.getTime() - 5 * 60 * 60 * 1000)
+    const h = String(base.getUTCHours()).padStart(2, '0')
+    const m = String(base.getUTCMinutes()).padStart(2, '0')
+    const s = String(base.getUTCSeconds()).padStart(2, '0')
     return `${h}:${m}:${s}`
   }
 
   const fechaCol = () => {
-    const col = new Date(ahora.getTime() - 5 * 60 * 60 * 1000)
+    const base = new Date(ahora.getTime() - 5 * 60 * 60 * 1000)
     const dias = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb']
     const meses = ['Ene', 'Feb', 'Mar', 'Abr', 'May', 'Jun', 'Jul', 'Ago', 'Sep', 'Oct', 'Nov', 'Dic']
-    return `${dias[col.getUTCDay()]}, ${col.getUTCDate()} ${meses[col.getUTCMonth()]} ${col.getUTCFullYear()}`
+    return `${dias[base.getUTCDay()]}, ${base.getUTCDate()} ${meses[base.getUTCMonth()]} ${base.getUTCFullYear()}`
   }
 
   const fetchStatus = useCallback(async (silent = false) => {
@@ -89,6 +94,10 @@ export default function MonitoreoPage() {
     }
     setLoading(false)
   }, [])
+
+  useEffect(() => {
+    if (!sessionStorage.getItem('gorilla_user')) router.push('/login')
+  }, [router])
 
   useEffect(() => {
     fetchStatus()
@@ -248,8 +257,8 @@ export default function MonitoreoPage() {
                 return (
                   <motion.div layout initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} key={emp.id}
                     className={`bg-white border rounded-2xl shadow-sm overflow-hidden transition-shadow ${hasCobrar ? 'border-amber-300 shadow-amber-100/60 shadow-md' :
-                        isWorking ? 'border-gorilla-purple/30 shadow-purple-100/60 shadow-md' :
-                          'border-slate-200'
+                      isWorking ? 'border-gorilla-purple/30 shadow-purple-100/60 shadow-md' :
+                        'border-slate-200'
                       }`}
                   >
                     {/* Barra superior */}
@@ -488,8 +497,8 @@ export default function MonitoreoPage() {
                 {(['efectivo', 'transferencia'] as const).map(m => (
                   <button key={m} onClick={() => setMetodoPago(m)}
                     className={`py-4 rounded-xl font-black text-[11px] tracking-widest border-2 transition-all flex flex-col items-center gap-1.5 ${metodoPago === m
-                        ? m === 'efectivo' ? 'bg-green-500 border-green-500 text-white' : 'bg-blue-600 border-blue-600 text-white'
-                        : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
+                      ? m === 'efectivo' ? 'bg-green-500 border-green-500 text-white' : 'bg-blue-600 border-blue-600 text-white'
+                      : 'bg-white border-slate-200 text-slate-500 hover:border-slate-300'
                       }`}>
                     {m === 'efectivo' ? <Wallet size={18} /> : <CreditCard size={18} />}
                     {m === 'efectivo' ? 'EFECTIVO' : 'TRANSF.'}

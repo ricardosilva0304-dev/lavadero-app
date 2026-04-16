@@ -5,7 +5,8 @@ import { Car, Bike, User, Check, Zap, ShieldCheck, CheckCircle2, Phone, Search }
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast, ToastContainer, Bounce, type ToastOptions } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
-import { ahoraISO, fechaHoyCol } from '@/utils/colombia'
+import { ahoraISO } from '@/utils/colombia'
+import { useRouter } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,6 +24,7 @@ const Notif = ({ title, desc, type }: { title: string; desc: string; type: 'succ
 
 export default function NuevoServicioPage() {
   const supabase = createClient()
+  const router = useRouter()
 
   // Maestros
   const [serviciosDB, setServiciosDB] = useState<any[]>([])
@@ -34,17 +36,23 @@ export default function NuevoServicioPage() {
   const [serviciosSeleccionados, setServiciosSeleccionados] = useState<any[]>([])
   const [empleadoAsignado, setEmpleadoAsignado] = useState('')
 
-  // Cliente
+  // Cliente — guardamos el id del cliente encontrado para no re-buscarlo al crear la orden
   const [telefono, setTelefono] = useState('')
   const [nombreCliente, setNombreCliente] = useState('')
   const [clienteEncontrado, setClienteEncontrado] = useState(false)
   const [clienteBuscado, setClienteBuscado] = useState(false)
+  const [clienteIdCacheado, setClienteIdCacheado] = useState<string | null>(null)
 
   // UI
   const [loading, setLoading] = useState(false)
   const [ordenFinalizada, setOrdenFinalizada] = useState(false)
 
   const toastOpts: ToastOptions = { position: 'top-center', autoClose: 2000, transition: Bounce, hideProgressBar: true, theme: 'light' }
+
+  // Auth guard
+  useEffect(() => {
+    if (!sessionStorage.getItem('gorilla_user')) router.push('/login')
+  }, [router])
 
   useEffect(() => {
     const fetchMaestros = async () => {
@@ -66,10 +74,12 @@ export default function NuevoServicioPage() {
       if (data) {
         setNombreCliente(data.nombre)
         setClienteEncontrado(true)
+        setClienteIdCacheado(data.id)  // guardamos el id para no re-buscarlo
         toast.success(<Notif title="Cliente encontrado" desc={data.nombre} type="success" />, toastOpts)
       } else {
         setNombreCliente('')
         setClienteEncontrado(false)
+        setClienteIdCacheado(null)
         toast.info(<Notif title="Cliente nuevo" desc="Ingresa el nombre" type="info" />, toastOpts)
       }
     } finally {
@@ -97,22 +107,23 @@ export default function NuevoServicioPage() {
       return toast.error(<Notif title="Error" desc="Ingresa el teléfono del cliente" type="error" />, toastOpts)
     if (!clienteBuscado)
       return toast.error(<Notif title="Error" desc="Busca primero el cliente" type="error" />, toastOpts)
+    if (!clienteEncontrado && !nombreCliente.trim())
+      return toast.error(<Notif title="Error" desc="Ingresa el nombre del cliente nuevo" type="error" />, toastOpts)
 
     setLoading(true)
     try {
-      // 1. Upsert cliente
-      const { data: clienteExistente } = await supabase
-        .from('clientes').select('id').eq('telefono', telefono.trim()).maybeSingle()
-
       let clienteId: string
-      if (clienteExistente) {
-        clienteId = clienteExistente.id
+
+      if (clienteIdCacheado) {
+        // Cliente ya existía — usar el id cacheado, actualizar nombre si cambió
+        clienteId = clienteIdCacheado
         if (nombreCliente.trim())
           await supabase.from('clientes').update({ nombre: nombreCliente.trim() }).eq('id', clienteId)
       } else {
+        // Cliente nuevo — crear
         const { data: nuevo, error: errC } = await supabase
           .from('clientes')
-          .insert([{ telefono: telefono.trim(), nombre: nombreCliente.trim() || 'Cliente Nuevo' }])
+          .insert([{ telefono: telefono.trim(), nombre: nombreCliente.trim() }])
           .select('id').single()
         if (errC || !nuevo) {
           toast.error(<Notif title="Error" desc="No se pudo crear el cliente" type="error" />, toastOpts)
@@ -156,6 +167,7 @@ export default function NuevoServicioPage() {
     setNombreCliente('')
     setClienteEncontrado(false)
     setClienteBuscado(false)
+    setClienteIdCacheado(null)
     setOrdenFinalizada(false)
   }
 
@@ -277,7 +289,7 @@ export default function NuevoServicioPage() {
                     placeholder="Número de teléfono"
                     className="w-full bg-slate-50 border-2 border-slate-200 focus:border-gorilla-orange p-3.5 pl-11 rounded-xl outline-none font-bold text-slate-900 text-sm placeholder:text-slate-300 transition-all"
                     value={telefono}
-                    onChange={e => { setTelefono(e.target.value); setClienteBuscado(false); setClienteEncontrado(false); setNombreCliente('') }}
+                    onChange={e => { setTelefono(e.target.value); setClienteBuscado(false); setClienteEncontrado(false); setNombreCliente(''); setClienteIdCacheado(null) }}
                     onKeyDown={e => e.key === 'Enter' && buscarCliente()}
                   />
                 </div>

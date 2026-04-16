@@ -18,14 +18,21 @@ export default function LoginPage() {
         setLoading(true)
         setError('')
 
-        const { data } = await supabase
+        const { data, error } = await supabase
             .from('perfiles')
             .select('*')
             .eq('cedula', cedula)
             .single()
 
+        // PGRST116 = "0 rows returned" → cédula no existe
+        // Cualquier otro error es de red, config o servidor
+        if (error && error.code !== 'PGRST116') {
+            setError('Error de conexión. Verifica tu red e intenta de nuevo.')
+            setLoading(false)
+            return
+        }
+
         if (data) {
-            // CAMBIO AQUÍ: Usamos sessionStorage en lugar de localStorage
             sessionStorage.setItem('gorilla_user', JSON.stringify({
                 cedula: data.cedula,
                 nombre: data.nombre,

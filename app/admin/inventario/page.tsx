@@ -9,11 +9,13 @@ import {
 } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { type Rol, puedeGestionarInventario } from '@/utils/roles'
+import { useRouter } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
 
 export default function InventarioPage() {
   const supabase = createClient()
+  const router = useRouter()
   const [productos, setProductos] = useState<any[]>([])
   const [activeTab, setActiveTab] = useState<'venta' | 'gestion'>('venta')
   const [busqueda, setBusqueda] = useState('')
@@ -22,14 +24,17 @@ export default function InventarioPage() {
   const [carrito, setCarrito] = useState<any[]>([])
   const [metodoPago, setMetodoPago] = useState<'efectivo' | 'transferencia'>('efectivo')
   const [loadingVenta, setLoadingVenta] = useState(false)
+  const [ventaExitosa, setVentaExitosa] = useState(false)
+  const [ventaError, setVentaError] = useState('')
 
   const [form, setForm] = useState({ id: '', nombre: '', categoria: 'bebida', precio_venta: 0, stock: 0 })
   const [isEditing, setIsEditing] = useState(false)
 
   useEffect(() => {
     const userData = sessionStorage.getItem('gorilla_user')
-    if (userData) setUserRol(JSON.parse(userData).rol ?? 'empleado')
-  }, [])
+    if (!userData) { router.push('/login'); return }
+    setUserRol(JSON.parse(userData).rol ?? 'empleado')
+  }, [router])
 
   const puedeGestion = puedeGestionarInventario(userRol)
 
@@ -73,12 +78,36 @@ export default function InventarioPage() {
   const procesarVenta = async () => {
     if (carrito.length === 0) return
     setLoadingVenta(true)
+    setVentaError('')
     try {
-      // Procesamos todas las actualizaciones en paralelo para evitar inconsistencias parciales
+      // Re-consultamos el stock actual de cada producto antes de actualizar
+      // para evitar race conditions si otro usuario vendió mientras tanto
+      const ids = carrito.map(item => item.id)
+      const { data: stockActual, error: errStock } = await supabase
+        .from('productos')
+        .select('id, stock, nombre')
+        .in('id', ids)
+
+      if (errStock || !stockActual) throw new Error('No se pudo verificar el stock')
+
+      // Verificar que hay stock suficiente para todos los items
+      for (const item of carrito) {
+        const prod = stockActual.find(p => p.id === item.id)
+        if (!prod || prod.stock < item.cantidad) {
+          setVentaError(`Stock insuficiente para "${item.nombre}". Disponible: ${prod?.stock ?? 0}`)
+          setLoadingVenta(false)
+          return
+        }
+      }
+
+      // Actualizar stock con valor real desde BD y registrar ventas
       await Promise.all(
-        carrito.map(item =>
-          Promise.all([
-            supabase.from('productos').update({ stock: item.stock - item.cantidad }).eq('id', item.id),
+        carrito.map(item => {
+          const stockReal = stockActual.find(p => p.id === item.id)!.stock
+          return Promise.all([
+            supabase.from('productos')
+              .update({ stock: stockReal - item.cantidad })
+              .eq('id', item.id),
             supabase.from('ventas_productos').insert([{
               producto_id: item.id,
               nombre_producto: item.nombre,
@@ -87,14 +116,16 @@ export default function InventarioPage() {
               metodo_pago: metodoPago
             }])
           ])
-        )
+        })
       )
+
       setCarrito([])
       fetchProductos()
-      alert('Venta registrada con éxito')
+      setVentaExitosa(true)
+      setTimeout(() => setVentaExitosa(false), 3000)
     } catch (error) {
       console.error(error)
-      alert('Error al procesar la venta. Verifica el stock.')
+      setVentaError('Error al procesar la venta. Intenta de nuevo.')
     } finally {
       setLoadingVenta(false)
     }
@@ -269,8 +300,19 @@ export default function InventarioPage() {
                       disabled={carrito.length === 0 || loadingVenta}
                       className="w-full bg-gorilla-orange hover:bg-orange-600 text-white py-4 sm:py-5 rounded-2xl font-black italic uppercase tracking-[0.1em] shadow-[0_0_20px_rgba(249,115,22,0.3)] active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 transition-all text-sm sm:text-base"
                     >
-                      {loadingVenta ? 'Procesando...' : <>FINALIZAR <ArrowRight size={18} strokeWidth={3} /></>}
+                      {loadingVenta ? 'Verificando stock...' : <>FINALIZAR <ArrowRight size={18} strokeWidth={3} /></>}
                     </button>
+
+                    {ventaExitosa && (
+                      <div className="mt-3 bg-green-50 border border-green-200 text-green-700 text-[10px] font-black uppercase tracking-widest px-4 py-3 rounded-xl text-center">
+                        ✅ Venta registrada con éxito
+                      </div>
+                    )}
+                    {ventaError && (
+                      <div className="mt-3 bg-red-50 border border-red-200 text-red-600 text-[10px] font-black uppercase tracking-widest px-4 py-3 rounded-xl text-center">
+                        ⚠️ {ventaError}
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

@@ -6,9 +6,12 @@ import {
   Wallet, TrendingUp, ArrowUpRight, RefreshCw
 } from 'lucide-react'
 import { motion } from 'framer-motion'
+import { fechaHoyCol, rangoDiaCol } from '@/utils/colombia'
+import { useRouter } from 'next/navigation'
 
 export default function ResumenPage() {
   const supabase = createClient()
+  const router = useRouter()
   const [range, setRange] = useState('hoy')
   const [data, setData] = useState({
     lavadero: { total: 0, efectivo: 0, transferencia: 0, cantidad: 0 },
@@ -18,35 +21,45 @@ export default function ResumenPage() {
   const [loading, setLoading] = useState(true)
   const [lastUpdate, setLastUpdate] = useState<Date>(new Date())
 
-  // ── Fecha Colombia YYYY-MM-DD ──────────────────────────────────────────────
-  const toLocalDate = (d: Date) => {
-    // Ajuste a UTC-5 Colombia
-    const col = new Date(d.getTime() - 5 * 60 * 60 * 1000)
+  // ── Helper: suma N días a una fecha YYYY-MM-DD ────────────────────────────
+  const sumarDias = (fechaStr: string, dias: number): string => {
+    const [y, m, d] = fechaStr.split('-').map(Number)
+    const date = new Date(Date.UTC(y, m - 1, d + dias))
     const pad = (n: number) => String(n).padStart(2, '0')
-    return `${col.getUTCFullYear()}-${pad(col.getUTCMonth() + 1)}-${pad(col.getUTCDate())}`
+    return `${date.getUTCFullYear()}-${pad(date.getUTCMonth() + 1)}-${pad(date.getUTCDate())}`
   }
 
   const fetchResumen = useCallback(async () => {
     setLoading(true)
 
-    const hoy = new Date(new Date().getTime() - 5 * 60 * 60 * 1000)
-    let startDate = new Date(hoy)
-    let endDate = new Date(hoy)
+    const hoy = fechaHoyCol()
+    let inicioISO: string
+    let finISO: string
 
     if (range === 'ayer') {
-      startDate.setDate(hoy.getDate() - 1)
-      endDate.setDate(hoy.getDate() - 1)
+      const ayer = sumarDias(hoy, -1)
+      const r = rangoDiaCol(ayer)
+      inicioISO = r.inicio
+      finISO = r.fin
     } else if (range === 'semana') {
-      startDate.setDate(hoy.getDate() - 6)
+      const inicio = rangoDiaCol(sumarDias(hoy, -6))
+      const fin = rangoDiaCol(hoy)
+      inicioISO = inicio.inicio
+      finISO = fin.fin
     } else if (range === 'mes') {
-      startDate.setDate(hoy.getDate() - 29)
+      const inicio = rangoDiaCol(sumarDias(hoy, -29))
+      const fin = rangoDiaCol(hoy)
+      inicioISO = inicio.inicio
+      finISO = fin.fin
     } else if (range === 'siempre') {
-      startDate = new Date(2020, 0, 1)
-      endDate = new Date(2099, 11, 31)
+      inicioISO = '2020-01-01T00:00:00.000Z'
+      finISO = '2099-12-31T23:59:59.000Z'
+    } else {
+      // hoy
+      const r = rangoDiaCol(hoy)
+      inicioISO = r.inicio
+      finISO = r.fin
     }
-
-    const inicioISO = `${toLocalDate(startDate)}T00:00:00`
-    const finISO = `${toLocalDate(endDate)}T23:59:59`
 
     const [lav, par, inv] = await Promise.all([
       supabase.from('ordenes_servicio')
@@ -87,6 +100,11 @@ export default function ResumenPage() {
     setLastUpdate(new Date())
     setLoading(false)
   }, [range])
+
+  // Auth guard
+  useEffect(() => {
+    if (!sessionStorage.getItem('gorilla_user')) router.push('/login')
+  }, [router])
 
   // ── Carga inicial y cuando cambia el rango ────────────────────────────────
   useEffect(() => { fetchResumen() }, [fetchResumen])

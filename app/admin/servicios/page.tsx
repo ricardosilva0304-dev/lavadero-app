@@ -31,7 +31,7 @@ export default function ServiciosPage() {
             const { data: ordenes } = await supabase
                 .from('ordenes_servicio')
                 .select('servicios_ids, tipo_vehiculo')
-                .eq('estado', 'terminado')
+                .eq('estado', 'cobrado')
 
             if (srv && ordenes) {
                 const stats = srv.map(s => {
@@ -120,8 +120,8 @@ export default function ServiciosPage() {
                     {(['todos', 'carro', 'moto'] as const).map(f => (
                         <button key={f} onClick={() => setFiltro(f)}
                             className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all border ${filtro === f
-                                    ? 'bg-slate-900 text-white border-slate-900'
-                                    : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
+                                ? 'bg-slate-900 text-white border-slate-900'
+                                : 'bg-white text-slate-500 border-slate-200 hover:border-slate-300'
                                 }`}>
                             {f === 'todos' ? <BarChart3 size={12} /> : f === 'carro' ? <Car size={12} /> : <Bike size={12} />}
                             {f === 'todos' ? 'Todos' : f === 'carro' ? 'Carros' : 'Motos'}
@@ -158,9 +158,9 @@ export default function ServiciosPage() {
                                     <div className="flex items-center gap-4">
                                         {/* Posición */}
                                         <div className={`w-8 h-8 shrink-0 rounded-xl flex items-center justify-center font-black text-sm ${idx === 0 ? 'bg-gorilla-orange text-white' :
-                                                idx === 1 ? 'bg-slate-700 text-white' :
-                                                    idx === 2 ? 'bg-amber-600 text-white' :
-                                                        'bg-slate-100 text-slate-500'
+                                            idx === 1 ? 'bg-slate-700 text-white' :
+                                                idx === 2 ? 'bg-amber-600 text-white' :
+                                                    'bg-slate-100 text-slate-500'
                                             }`}>
                                             {idx + 1}
                                         </div>

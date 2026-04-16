@@ -3,15 +3,21 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { FileText, Package, Clock, Search, TrendingUp, Calendar, Tag, Car, Printer } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useRouter } from 'next/navigation'
 
 export const dynamic = 'force-dynamic'
 
 export default function ReportesPage() {
     const supabase = createClient()
+    const router = useRouter()
     const [activeTab, setActiveTab] = useState<'ventas' | 'inventario' | 'parqueadero'>('ventas')
     const [data, setData] = useState<any[]>([])
     const [loading, setLoading] = useState(true)
     const [filtro, setFiltro] = useState('')
+
+    useEffect(() => {
+        if (!sessionStorage.getItem('gorilla_user')) router.push('/login')
+    }, [router])
 
     useEffect(() => { fetchReporte() }, [activeTab])
 
@@ -19,7 +25,7 @@ export default function ReportesPage() {
         setLoading(true)
         let query: any
         if (activeTab === 'ventas') {
-            query = supabase.from('ordenes_servicio').select('*, perfiles(nombre)').order('creado_en', { ascending: false })
+            query = supabase.from('ordenes_servicio').select('*, empleado:perfiles!empleado_id(nombre)').order('creado_en', { ascending: false })
         } else if (activeTab === 'inventario') {
             query = supabase.from('productos').select('*').order('stock', { ascending: true })
         } else {
@@ -61,11 +67,11 @@ export default function ReportesPage() {
         if (activeTab === 'ventas') {
             return {
                 titulo: item.placa,
-                subtitulo: item.perfiles?.nombre || 'General',
+                subtitulo: item.empleado?.nombre || 'Sin asignar',
                 detalle: item.nombres_servicios,
                 isCritico: false,
                 valor: parseFloat(item.total) || 0,
-                fecha: new Date(item.creado_en).toLocaleDateString('es-CO'),
+                fecha: new Date(item.creado_en).toLocaleDateString('es-CO', { timeZone: 'America/Bogota' }),
                 icon: <Car size={18} />
             }
         }
@@ -75,7 +81,7 @@ export default function ReportesPage() {
             detalle: item.tipo_tarifa === 'dia' ? 'Cobro por Día' : 'Cobro por Mes',
             isCritico: false,
             valor: parseFloat(item.total_pagar) || 0,
-            fecha: new Date(item.hora_salida).toLocaleDateString('es-CO'),
+            fecha: new Date(item.hora_salida).toLocaleDateString('es-CO', { timeZone: 'America/Bogota' }),
             icon: <Clock size={18} />
         }
     }

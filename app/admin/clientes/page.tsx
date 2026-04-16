@@ -4,9 +4,11 @@ import { createClient } from '@/utils/supabase/client'
 import { Search, Phone, Edit3, Trash2, Users, Star, X, User, ChevronRight } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { type Rol, puedeCRUD } from '@/utils/roles'
+import { useRouter } from 'next/navigation'
 
 export default function BaseClientesPage() {
   const supabase = createClient()
+  const router = useRouter()
   const [clientes, setClientes] = useState<any[]>([])
   const [busqueda, setBusqueda] = useState('')
   const [loading, setLoading] = useState(true)
@@ -16,9 +18,10 @@ export default function BaseClientesPage() {
 
   useEffect(() => {
     const userData = sessionStorage.getItem('gorilla_user')
-    const rol: Rol = userData ? JSON.parse(userData).rol : 'empleado'
+    if (!userData) { router.push('/login'); return }
+    const rol: Rol = JSON.parse(userData).rol
     setPuedeEditar(puedeCRUD(rol))
-  }, [])
+  }, [router])
 
   const fetchClientes = useCallback(async () => {
     setLoading(true)

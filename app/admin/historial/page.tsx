@@ -4,22 +4,27 @@ import { createClient } from '@/utils/supabase/client'
 import { Search, FileText, User, Car, Tag, Trash2, Calendar, Phone } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { type Rol, puedeCRUD } from '@/utils/roles'
+import { useRouter } from 'next/navigation'
+import { isoAFechaCol, fechaHoyCol } from '@/utils/colombia'
 
 export const dynamic = 'force-dynamic'
 
 export default function HistorialPage() {
   const supabase = createClient()
+  const router = useRouter()
   const [ordenes, setOrdenes] = useState<any[]>([])
   const [busqueda, setBusqueda] = useState('')
   const [loading, setLoading] = useState(true)
   const [filtroPago, setFiltroPago] = useState<'todos' | 'efectivo' | 'transferencia'>('todos')
+  const [soloFinalizados, setSoloFinalizados] = useState(true)
   const [puedeEliminar, setPuedeEliminar] = useState(false)
 
   useEffect(() => {
     const userData = sessionStorage.getItem('gorilla_user')
-    const rol: Rol = userData ? JSON.parse(userData).rol : 'empleado'
+    if (!userData) { router.push('/login'); return }
+    const rol: Rol = JSON.parse(userData).rol
     setPuedeEliminar(puedeCRUD(rol))
-  }, [])
+  }, [router])
 
   const fetchHistorial = useCallback(async () => {
     setLoading(true)
@@ -57,29 +62,31 @@ export default function HistorialPage() {
       (o.cliente?.nombre || '').toLowerCase().includes(term) ||
       (o.cliente?.telefono || '').includes(term)
     const matchPago = filtroPago === 'todos' || o.metodo_pago === filtroPago
-    return matchBusqueda && matchPago
+    const matchEstado = !soloFinalizados || o.estado === 'cobrado'
+    return matchBusqueda && matchPago && matchEstado
   })
 
-  const totalFiltrado = filtered.reduce((acc, o) => acc + (parseFloat(o.total) || 0), 0)
+  // El total solo suma órdenes cobradas para que sea un número real de dinero
+  const totalFiltrado = filtered
+    .filter(o => o.estado === 'cobrado')
+    .reduce((acc, o) => acc + (parseFloat(o.total) || 0), 0)
 
   const agruparPorFecha = (lista: any[]) => {
     const grupos: { [key: string]: any[] } = {}
-    // Hoy y ayer en Colombia (UTC-5)
-    const offset = -5 * 60 * 60 * 1000
-    const colNow = new Date(Date.now() + offset)
-    const colAyer = new Date(colNow.getTime() - 86400000)
-    const fmt = (d: Date) => `${d.getUTCFullYear()}-${String(d.getUTCMonth()+1).padStart(2,'0')}-${String(d.getUTCDate()).padStart(2,'0')}`
-    const hoyStr = fmt(colNow)
-    const ayerStr = fmt(colAyer)
+    const hoyStr = fechaHoyCol()
+    const [y, m, d] = hoyStr.split('-').map(Number)
+    const ayerDate = new Date(Date.UTC(y, m - 1, d - 1))
+    const ayerStr = `${ayerDate.getUTCFullYear()}-${String(ayerDate.getUTCMonth() + 1).padStart(2, '0')}-${String(ayerDate.getUTCDate()).padStart(2, '0')}`
 
     lista.forEach(o => {
-      const colFecha = new Date(new Date(o.creado_en).getTime() + offset)
-      const recordStr = fmt(colFecha)
+      const recordStr = isoAFechaCol(o.creado_en)
       const nombreGrupo =
-        recordStr === hoyStr  ? 'HOY' :
-        recordStr === ayerStr ? 'AYER' :
-        new Intl.DateTimeFormat('es-CO', { day: '2-digit', month: 'long', year: 'numeric' })
-          .format(colFecha).toUpperCase()
+        recordStr === hoyStr ? 'HOY' :
+          recordStr === ayerStr ? 'AYER' :
+            new Intl.DateTimeFormat('es-CO', {
+              day: '2-digit', month: 'long', year: 'numeric',
+              timeZone: 'America/Bogota'
+            }).format(new Date(o.creado_en)).toUpperCase()
       if (!grupos[nombreGrupo]) grupos[nombreGrupo] = []
       grupos[nombreGrupo].push(o)
     })
@@ -128,6 +135,11 @@ export default function HistorialPage() {
                 </button>
               ))}
             </div>
+            <button
+              onClick={() => setSoloFinalizados(prev => !prev)}
+              className={`flex items-center gap-2 px-4 py-3 rounded-[1.5rem] border text-[10px] font-black tracking-widest uppercase transition-all shrink-0 shadow-sm ${soloFinalizados ? 'bg-gorilla-orange text-white border-orange-400' : 'bg-white text-slate-500 border-slate-200/60 hover:text-slate-800'}`}>
+              {soloFinalizados ? '✅ Solo cobrados' : '📋 Todas las órdenes'}
+            </button>
             <div className="relative flex-1 group">
               <Search className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-400 group-focus-within:text-gorilla-orange transition-colors" size={16} />
               <input
@@ -199,9 +211,24 @@ export default function HistorialPage() {
                                 Op: <span className="text-slate-800">{o.empleado?.nombre || 'N/A'}</span>
                               </span>
                               <span className={`text-[8px] font-black px-2 py-0.5 rounded-md uppercase tracking-widest border w-fit ${o.metodo_pago === 'efectivo'
-                                  ? 'bg-green-50 text-green-600 border-green-200'
-                                  : 'bg-blue-50 text-blue-600 border-blue-200'
-                                }`}>{o.metodo_pago}</span>
+                                ? 'bg-green-50 text-green-600 border-green-200'
+                                : o.metodo_pago === 'transferencia'
+                                  ? 'bg-blue-50 text-blue-600 border-blue-200'
+                                  : o.estado === 'pendiente'
+                                    ? 'bg-yellow-50 text-yellow-600 border-yellow-200'
+                                    : o.estado === 'en_proceso'
+                                      ? 'bg-blue-50 text-blue-500 border-blue-200'
+                                      : o.estado === 'terminado'
+                                        ? 'bg-amber-50 text-amber-600 border-amber-200'
+                                        : 'bg-slate-50 text-slate-400 border-slate-200'
+                                }`}>
+                                {o.metodo_pago
+                                  ? o.metodo_pago
+                                  : o.estado === 'pendiente' ? '⏳ En espera'
+                                    : o.estado === 'en_proceso' ? '🔄 Lavando'
+                                      : o.estado === 'terminado' ? '⏳ Sin cobrar'
+                                        : o.estado}
+                              </span>
                             </div>
                             <span className="text-xl sm:text-2xl font-black text-gorilla-orange tracking-tighter leading-none">
                               ${(parseFloat(o.total) || 0).toLocaleString('es-CO')}
