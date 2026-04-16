@@ -1,7 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
-import { Car, Bike, User, Check, Zap, ShieldCheck, CheckCircle2, Phone, Search } from 'lucide-react'
+import { Car, Bike, User, Check, Zap, ShieldCheck, CheckCircle2, Phone } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { toast, ToastContainer, Bounce, type ToastOptions } from 'react-toastify'
 import 'react-toastify/dist/ReactToastify.css'
@@ -45,6 +45,7 @@ export default function NuevoServicioPage() {
 
   // UI
   const [loading, setLoading] = useState(false)
+  const [buscandoCliente, setBuscandoCliente] = useState(false)
   const [ordenFinalizada, setOrdenFinalizada] = useState(false)
 
   const toastOpts: ToastOptions = { position: 'top-center', autoClose: 2000, transition: Bounce, hideProgressBar: true, theme: 'light' }
@@ -66,7 +67,7 @@ export default function NuevoServicioPage() {
 
   const buscarCliente = async () => {
     if (!telefono.trim()) return
-    setLoading(true)
+    setBuscandoCliente(true)
     try {
       const { data } = await supabase
         .from('clientes').select('id, nombre').eq('telefono', telefono.trim()).maybeSingle()
@@ -74,7 +75,7 @@ export default function NuevoServicioPage() {
       if (data) {
         setNombreCliente(data.nombre)
         setClienteEncontrado(true)
-        setClienteIdCacheado(data.id)  // guardamos el id para no re-buscarlo
+        setClienteIdCacheado(data.id)
         toast.success(<Notif title="Cliente encontrado" desc={data.nombre} type="success" />, toastOpts)
       } else {
         setNombreCliente('')
@@ -83,9 +84,25 @@ export default function NuevoServicioPage() {
         toast.info(<Notif title="Cliente nuevo" desc="Ingresa el nombre" type="info" />, toastOpts)
       }
     } finally {
-      setLoading(false)
+      setBuscandoCliente(false)
     }
   }
+
+  // Búsqueda automática con debounce — dispara sola al escribir el teléfono
+  useEffect(() => {
+    // Solo buscar cuando hay al menos 7 dígitos (número colombiano mínimo)
+    if (telefono.trim().length < 7) {
+      setClienteBuscado(false)
+      setClienteEncontrado(false)
+      setNombreCliente('')
+      setClienteIdCacheado(null)
+      return
+    }
+    const timer = setTimeout(() => {
+      buscarCliente()
+    }, 600) // espera 600ms después de que el usuario deje de escribir
+    return () => clearTimeout(timer)
+  }, [telefono])
 
   const toggleServicio = (srv: any) => {
     setServiciosSeleccionados(prev =>
@@ -281,41 +298,102 @@ export default function NuevoServicioPage() {
               <h2 className="text-sm font-black uppercase italic text-slate-800 tracking-tight flex items-center gap-2 mb-4">
                 <User size={16} className="text-gorilla-orange" /> Cliente
               </h2>
-              <div className="flex gap-2 mb-3">
-                <div className="relative flex-1">
-                  <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
-                  <input
-                    type="tel"
-                    placeholder="Número de teléfono"
-                    className="w-full bg-slate-50 border-2 border-slate-200 focus:border-gorilla-orange p-3.5 pl-11 rounded-xl outline-none font-bold text-slate-900 text-sm placeholder:text-slate-300 transition-all"
-                    value={telefono}
-                    onChange={e => { setTelefono(e.target.value); setClienteBuscado(false); setClienteEncontrado(false); setNombreCliente(''); setClienteIdCacheado(null) }}
-                    onKeyDown={e => e.key === 'Enter' && buscarCliente()}
-                  />
-                </div>
-                <button
-                  onClick={buscarCliente}
-                  disabled={loading || !telefono.trim()}
-                  className="bg-gorilla-orange hover:bg-orange-600 text-white px-4 rounded-xl transition-all disabled:opacity-40 shrink-0"
-                >
-                  <Search size={18} />
-                </button>
-              </div>
-              <AnimatePresence>
-                {clienteBuscado && (
-                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
-                    <div className="relative">
-                      <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
-                      <input
-                        placeholder="Nombre del cliente"
-                        className={`w-full bg-slate-50 border-2 p-3.5 pl-11 rounded-xl outline-none font-bold uppercase text-xs text-slate-900 placeholder:text-slate-300 transition-all ${clienteEncontrado ? 'border-green-400' : 'border-blue-300 focus:border-blue-400'}`}
-                        value={nombreCliente}
-                        onChange={e => setNombreCliente(e.target.value)}
-                      />
+
+              {/* Teléfono con indicador de estado integrado */}
+              <div className="relative mb-3">
+                <Phone className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+                <input
+                  type="tel"
+                  placeholder="Número de teléfono"
+                  className={`w-full bg-slate-50 border-2 p-3.5 pl-11 pr-12 rounded-xl outline-none font-bold text-slate-900 text-sm placeholder:text-slate-300 transition-all ${clienteEncontrado ? 'border-green-400 bg-green-50/30' :
+                      clienteBuscado && !clienteEncontrado ? 'border-blue-300 bg-blue-50/20' :
+                        'border-slate-200 focus:border-gorilla-orange'
+                    }`}
+                  value={telefono}
+                  onChange={e => {
+                    setTelefono(e.target.value)
+                    setClienteBuscado(false)
+                    setClienteEncontrado(false)
+                    setNombreCliente('')
+                    setClienteIdCacheado(null)
+                  }}
+                />
+                {/* Indicador de estado a la derecha del input */}
+                <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                  {buscandoCliente && (
+                    <div className="w-5 h-5 border-2 border-gorilla-orange border-t-transparent rounded-full animate-spin" />
+                  )}
+                  {!buscandoCliente && clienteEncontrado && (
+                    <div className="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center">
+                      <Check size={12} strokeWidth={3} className="text-white" />
                     </div>
-                    <p className={`text-[9px] font-black uppercase tracking-widest mt-1.5 ml-1 ${clienteEncontrado ? 'text-green-500' : 'text-blue-500'}`}>
-                      {clienteEncontrado ? '✓ Cliente registrado' : '+ Cliente nuevo — se guardará automáticamente'}
-                    </p>
+                  )}
+                  {!buscandoCliente && clienteBuscado && !clienteEncontrado && (
+                    <div className="w-6 h-6 bg-blue-400 rounded-full flex items-center justify-center">
+                      <User size={11} className="text-white" />
+                    </div>
+                  )}
+                  {!buscandoCliente && !clienteBuscado && telefono.trim().length > 0 && telefono.trim().length < 7 && (
+                    <span className="text-[9px] text-slate-400 font-black">
+                      {telefono.trim().length}/7
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Mensaje de estado debajo del input */}
+              {!buscandoCliente && telefono.trim().length > 0 && telefono.trim().length < 7 && (
+                <p className="text-[9px] text-slate-400 font-black uppercase tracking-widest mb-3">
+                  Escribe el número completo para buscar automáticamente
+                </p>
+              )}
+              {buscandoCliente && (
+                <p className="text-[9px] text-gorilla-orange font-black uppercase tracking-widest mb-3">
+                  Buscando cliente...
+                </p>
+              )}
+
+              {/* Campo nombre — aparece automáticamente tras la búsqueda */}
+              <AnimatePresence>
+                {clienteBuscado && !buscandoCliente && (
+                  <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: 'auto', opacity: 1 }} exit={{ height: 0, opacity: 0 }} className="overflow-hidden">
+                    {clienteEncontrado ? (
+                      /* Cliente existente — nombre editable pero ya relleno */
+                      <div>
+                        <div className="flex items-center gap-2 bg-green-50 border border-green-200 rounded-xl px-4 py-3 mb-2">
+                          <div className="w-8 h-8 bg-green-500 rounded-lg flex items-center justify-center shrink-0">
+                            <Check size={14} strokeWidth={3} className="text-white" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[9px] font-black text-green-600 uppercase tracking-widest">Cliente registrado</p>
+                            <p className="text-sm font-black text-green-800 uppercase truncate">{nombreCliente}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      /* Cliente nuevo — pedir nombre */
+                      <div>
+                        <div className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-xl px-4 py-3 mb-3">
+                          <div className="w-8 h-8 bg-blue-400 rounded-lg flex items-center justify-center shrink-0">
+                            <User size={14} className="text-white" />
+                          </div>
+                          <div>
+                            <p className="text-[9px] font-black text-blue-600 uppercase tracking-widest">Cliente nuevo</p>
+                            <p className="text-[10px] font-bold text-blue-500">Escribe su nombre para registrarlo</p>
+                          </div>
+                        </div>
+                        <div className="relative">
+                          <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" size={15} />
+                          <input
+                            placeholder="Nombre del cliente *"
+                            autoFocus
+                            className="w-full bg-slate-50 border-2 border-blue-300 focus:border-blue-400 p-3.5 pl-11 rounded-xl outline-none font-bold uppercase text-xs text-slate-900 placeholder:text-slate-300 transition-all"
+                            value={nombreCliente}
+                            onChange={e => setNombreCliente(e.target.value)}
+                          />
+                        </div>
+                      </div>
+                    )}
                   </motion.div>
                 )}
               </AnimatePresence>
@@ -395,15 +473,28 @@ export default function NuevoServicioPage() {
             </div>
 
             {/* Cliente */}
-            {clienteBuscado && (
-              <div className="bg-white/5 rounded-xl p-3 border border-white/10 flex items-center gap-3">
-                <div className="w-8 h-8 bg-gorilla-orange/20 rounded-lg flex items-center justify-center text-gorilla-orange shrink-0">
-                  <User size={15} />
+            {(buscandoCliente || clienteBuscado || telefono.trim().length > 0) && (
+              <div className={`rounded-xl p-3 border flex items-center gap-3 transition-all ${clienteEncontrado ? 'bg-green-500/10 border-green-500/30' :
+                  clienteBuscado ? 'bg-blue-500/10 border-blue-500/30' :
+                    'bg-white/5 border-white/10'
+                }`}>
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${clienteEncontrado ? 'bg-green-500/30 text-green-400' :
+                    clienteBuscado ? 'bg-blue-400/30 text-blue-400' :
+                      'bg-white/10 text-gray-400'
+                  }`}>
+                  {buscandoCliente
+                    ? <div className="w-4 h-4 border-2 border-gorilla-orange border-t-transparent rounded-full animate-spin" />
+                    : <User size={15} />
+                  }
                 </div>
                 <div className="min-w-0">
-                  <p className="text-[9px] text-gray-400 font-black uppercase tracking-widest">Cliente</p>
-                  <p className="text-xs font-black uppercase text-white truncate">{nombreCliente || 'Sin nombre'}</p>
-                  <p className="text-[9px] text-gray-500 font-bold">{telefono}</p>
+                  <p className="text-[9px] text-gray-400 font-black uppercase tracking-widest">
+                    {buscandoCliente ? 'Buscando...' : clienteEncontrado ? 'Cliente registrado' : clienteBuscado ? 'Cliente nuevo' : 'Cliente'}
+                  </p>
+                  <p className="text-xs font-black uppercase text-white truncate">
+                    {nombreCliente || (buscandoCliente ? '...' : telefono || '—')}
+                  </p>
+                  {telefono && <p className="text-[9px] text-gray-500 font-bold">{telefono}</p>}
                 </div>
               </div>
             )}

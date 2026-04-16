@@ -42,14 +42,18 @@ export default function ConfiguracionPage() {
   // ── Auth guard ──────────────────────────────────────────────────────────────
   useEffect(() => {
     const userData = sessionStorage.getItem('gorilla_user')
-    const rol = userData ? JSON.parse(userData).rol : null
+    if (!userData) {
+      router.push('/login')
+      return
+    }
+    const rol = JSON.parse(userData).rol
     if (!puedeVerConfiguracion(rol)) {
       setAccesoDenegado(true)
       setLoading(false)
       return
     }
     fetchData()
-  }, [])
+  }, [router])
 
   // ── Fetch ───────────────────────────────────────────────────────────────────
   const fetchData = async () => {
@@ -308,8 +312,8 @@ export default function ConfiguracionPage() {
                 <div key={u.id} className="bg-slate-50 border border-slate-100 p-4 rounded-[1.5rem] flex items-center justify-between hover:border-slate-300 transition-colors">
                   <div className="flex items-center gap-4 overflow-hidden pr-2 min-w-0">
                     <div className={`w-12 h-12 rounded-xl flex items-center justify-center font-black text-sm shrink-0 ${u.rol === 'coordinador' ? 'bg-orange-100 text-gorilla-orange' :
-                        u.rol === 'vendedor' ? 'bg-green-100 text-green-600' :
-                          'bg-purple-100 text-gorilla-purple'
+                      u.rol === 'vendedor' ? 'bg-green-100 text-green-600' :
+                        'bg-purple-100 text-gorilla-purple'
                       }`}>
                       {u.nombre?.[0]?.toUpperCase() ?? '?'}
                     </div>
