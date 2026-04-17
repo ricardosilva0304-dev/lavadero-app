@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import {
   Car, Coffee, Clock, CreditCard,
@@ -8,6 +8,8 @@ import {
 import { motion } from 'framer-motion'
 import { fechaHoyCol, rangoDiaCol } from '@/utils/colombia'
 import { useRouter } from 'next/navigation'
+
+export const dynamic = 'force-dynamic'
 
 export default function ResumenPage() {
   const supabase = createClient()
@@ -106,20 +108,23 @@ export default function ResumenPage() {
     if (!sessionStorage.getItem('gorilla_user')) router.push('/login')
   }, [router])
 
+  // ── Ref siempre apunta a la versión más reciente de fetchResumen ──────────
+  const fetchResumenRef = useRef(fetchResumen)
+  useEffect(() => { fetchResumenRef.current = fetchResumen }, [fetchResumen])
+
   // ── Carga inicial y cuando cambia el rango ────────────────────────────────
   useEffect(() => { fetchResumen() }, [fetchResumen])
 
-  // ── Tiempo real: escucha las 3 tablas relevantes ──────────────────────────
+  // ── Tiempo real: canal estable que nunca se recrea ────────────────────────
   useEffect(() => {
     const channel = supabase
       .channel('resumen_realtime')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'ordenes_servicio' }, () => fetchResumen())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'parqueadero_registros' }, () => fetchResumen())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'ventas_productos' }, () => fetchResumen())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ordenes_servicio' }, () => fetchResumenRef.current())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'parqueadero_registros' }, () => fetchResumenRef.current())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'ventas_productos' }, () => fetchResumenRef.current())
       .subscribe()
-
     return () => { supabase.removeChannel(channel) }
-  }, [fetchResumen])
+  }, []) // sin dependencias — se monta una vez, nunca se recrea
 
   // ── Totales globales ──────────────────────────────────────────────────────
   const granTotal = data.lavadero.total + data.parqueadero.total + data.inventario.total
@@ -209,7 +214,7 @@ export default function ResumenPage() {
                 </p>
               )}
               <p className="text-[9px] text-slate-600 font-bold uppercase tracking-widest mt-2">
-                Última actualización: {lastUpdate.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                Última actualización: {lastUpdate.toLocaleTimeString('es-CO', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZone: 'America/Bogota' })}
               </p>
             </div>
             <div className="p-3 bg-green-500/10 text-green-400 rounded-xl w-fit">

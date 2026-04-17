@@ -26,6 +26,7 @@ export default function MonitoreoPage() {
   const [ordenACobrar, setOrdenACobrar] = useState<any>(null)
   const [metodoPago, setMetodoPago] = useState<'efectivo' | 'transferencia'>('efectivo')
   const [loadingCobro, setLoadingCobro] = useState(false)
+  const [errorCobro, setErrorCobro] = useState('')
 
   // Reloj Colombia en vivo
   useEffect(() => {
@@ -121,12 +122,14 @@ export default function MonitoreoPage() {
   const abrirCobro = (orden: any) => {
     setOrdenACobrar(orden)
     setMetodoPago('efectivo')
+    setErrorCobro('')
   }
 
   // Confirmar cobro
   const confirmarCobro = async () => {
     if (!ordenACobrar) return
     setLoadingCobro(true)
+    setErrorCobro('')
     const { error } = await supabase
       .from('ordenes_servicio')
       .update({ estado: 'cobrado', metodo_pago: metodoPago })
@@ -148,6 +151,8 @@ export default function MonitoreoPage() {
         }
       }))
       setOrdenACobrar(null)
+    } else {
+      setErrorCobro('No se pudo registrar el cobro. Verifica tu conexión e intenta de nuevo.')
     }
     setLoadingCobro(false)
   }
@@ -464,7 +469,7 @@ export default function MonitoreoPage() {
               className="bg-white rounded-[2.5rem] p-7 sm:p-8 w-full max-w-sm shadow-2xl relative overflow-hidden">
               <div className="absolute top-0 left-0 w-full h-1.5 bg-gradient-to-r from-amber-400 to-green-500" />
 
-              <button onClick={() => setOrdenACobrar(null)} className="absolute top-5 right-5 p-2 bg-slate-100 rounded-full text-slate-400 hover:bg-slate-200 transition-colors">
+              <button onClick={() => { if (!loadingCobro) { setOrdenACobrar(null); setErrorCobro('') } }} disabled={loadingCobro} className="absolute top-5 right-5 p-2 bg-slate-100 rounded-full text-slate-400 hover:bg-slate-200 transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
                 <X size={18} />
               </button>
 
@@ -506,6 +511,12 @@ export default function MonitoreoPage() {
                   </button>
                 ))}
               </div>
+
+              {errorCobro && (
+                <div className="bg-red-50 border border-red-200 text-red-600 text-[10px] font-black uppercase tracking-widest px-4 py-3 rounded-xl text-center">
+                  ⚠️ {errorCobro}
+                </div>
+              )}
 
               <button onClick={confirmarCobro} disabled={loadingCobro}
                 className="w-full bg-slate-900 hover:bg-black text-white py-4 rounded-xl font-black uppercase tracking-widest text-sm active:scale-95 transition-all disabled:opacity-50 flex items-center justify-center gap-2">

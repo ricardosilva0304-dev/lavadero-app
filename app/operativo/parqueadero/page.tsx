@@ -23,6 +23,7 @@ export default function ParqueaderoPage() {
   const [loadingIngreso, setLoadingIngreso] = useState(false)
   const [loadingRegistros, setLoadingRegistros] = useState(true)
   const [loadingSalida, setLoadingSalida] = useState(false)
+  const [errorIngreso, setErrorIngreso] = useState('')
 
   const fetchRegistrosRef = useRef<(() => Promise<void>) | null>(null)
 
@@ -88,16 +89,21 @@ export default function ParqueaderoPage() {
     e.preventDefault()
     if (!form.placa.trim()) return
     setLoadingIngreso(true)
+    setErrorIngreso('')
     try {
-      await supabase.from('parqueadero_registros').insert([{
+      const { error } = await supabase.from('parqueadero_registros').insert([{
         nombre_cliente: form.nombre || null,
         celular: form.celular || null,
         placa: form.placa.toUpperCase().trim(),
         tipo_vehiculo: form.tipo
       }])
-      setForm({ nombre: '', celular: '', placa: '', tipo: 'carro' })
+      if (!error) {
+        setForm({ nombre: '', celular: '', placa: '', tipo: 'carro' })
+      } else {
+        setErrorIngreso('No se pudo registrar el ingreso. Intenta de nuevo.')
+      }
     } catch (err) {
-      console.error('Error al registrar ingreso:', err)
+      setErrorIngreso('Error de conexión. Verifica tu red e intenta de nuevo.')
     } finally {
       setLoadingIngreso(false)
     }
@@ -206,7 +212,7 @@ export default function ParqueaderoPage() {
                     required
                     className="w-full bg-slate-50 border border-slate-200/60 p-5 pt-9 rounded-[1.5rem] text-3xl sm:text-4xl font-black text-center uppercase tracking-tighter text-slate-900 outline-none focus:border-gorilla-orange focus:ring-4 focus:ring-orange-50 transition-all placeholder:text-slate-200 shadow-inner"
                     value={form.placa}
-                    onChange={e => setForm(f => ({ ...f, placa: e.target.value }))}
+                    onChange={e => setForm(f => ({ ...f, placa: e.target.value.toUpperCase() }))}
                   />
                 </div>
 
@@ -229,6 +235,12 @@ export default function ParqueaderoPage() {
                   className="w-full bg-gorilla-orange hover:bg-orange-600 text-white font-black py-4 sm:py-5 rounded-2xl shadow-lg shadow-orange-500/20 transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-3 uppercase tracking-widest text-sm">
                   {loadingIngreso ? 'Registrando...' : <><span>Registrar Ingreso</span><ArrowRight size={18} strokeWidth={3} /></>}
                 </button>
+
+                {errorIngreso && (
+                  <div className="bg-red-50 border border-red-200 text-red-600 text-[10px] font-black uppercase tracking-widest px-4 py-3 rounded-xl text-center">
+                    ⚠️ {errorIngreso}
+                  </div>
+                )}
               </form>
             </div>
           </div>

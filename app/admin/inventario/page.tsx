@@ -29,6 +29,9 @@ export default function InventarioPage() {
 
   const [form, setForm] = useState({ id: '', nombre: '', categoria: 'bebida', precio_venta: 0, stock: 0 })
   const [isEditing, setIsEditing] = useState(false)
+  const [guardandoProducto, setGuardandoProducto] = useState(false)
+  const [errorProducto, setErrorProducto] = useState('')
+  const [productoGuardado, setProductoGuardado] = useState('')
 
   useEffect(() => {
     const userData = sessionStorage.getItem('gorilla_user')
@@ -133,19 +136,38 @@ export default function InventarioPage() {
 
   const handleSave = async () => {
     if (!form.nombre || form.precio_venta <= 0) return
+    setGuardandoProducto(true)
+    setErrorProducto('')
+    const wasEditing = isEditing
     const payload = { ...form, precio_venta: Number(form.precio_venta), stock: Number(form.stock) }
-    if (isEditing) {
-      await supabase.from('productos').update(payload).eq('id', form.id)
-    } else {
-      const { id, ...nuevo } = payload
-      await supabase.from('productos').insert([nuevo])
+    try {
+      let error: any = null
+      if (isEditing) {
+        ; ({ error } = await supabase.from('productos').update(payload).eq('id', form.id))
+      } else {
+        const { id, ...nuevo } = payload
+          ; ({ error } = await supabase.from('productos').insert([nuevo]))
+      }
+      if (!error) {
+        resetForm()
+        fetchProductos()
+        setProductoGuardado(wasEditing ? 'actualizado' : 'agregado')
+        setTimeout(() => setProductoGuardado(''), 2500)
+      } else {
+        if (error.code === '23505') setErrorProducto('Ya existe un producto con ese nombre.')
+        else setErrorProducto('No se pudo guardar. Intenta de nuevo.')
+      }
+    } catch {
+      setErrorProducto('Error de conexión. Intenta de nuevo.')
+    } finally {
+      setGuardandoProducto(false)
     }
-    resetForm(); fetchProductos()
   }
 
   const resetForm = () => {
     setForm({ id: '', nombre: '', categoria: 'bebida', precio_venta: 0, stock: 0 })
     setIsEditing(false)
+    setErrorProducto('')
   }
 
   const productosFiltrados = productos.filter(p =>
@@ -357,14 +379,29 @@ export default function InventarioPage() {
                       <input type="number" min="0" className="w-full bg-slate-50 border border-slate-200/60 p-4 rounded-xl font-bold text-sm outline-none focus:bg-white focus:border-gorilla-orange transition-all" value={form.stock} onChange={e => setForm({ ...form, stock: Number(e.target.value) })} />
                     </div>
 
+                    {errorProducto && (
+                      <p className="text-red-500 text-xs font-bold bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+                        ⚠️ {errorProducto}
+                      </p>
+                    )}
+                    {productoGuardado && (
+                      <p className="text-green-600 text-xs font-bold bg-green-50 border border-green-200 rounded-xl px-4 py-3 flex items-center gap-2">
+                        ✅ Producto {productoGuardado}
+                      </p>
+                    )}
+
                     <div className="flex gap-3 pt-3">
                       {isEditing && (
                         <button onClick={resetForm} className="p-4 bg-slate-100 rounded-xl text-slate-500 hover:bg-slate-200 transition-all shrink-0">
                           <X size={20} />
                         </button>
                       )}
-                      <button onClick={handleSave} disabled={!form.nombre || form.precio_venta <= 0} className="flex-1 bg-gorilla-purple hover:bg-purple-700 disabled:opacity-50 text-white p-4 rounded-xl font-black italic uppercase tracking-widest shadow-lg shadow-purple-200 transition-all active:scale-95 flex items-center justify-center gap-2">
-                        <Save size={18} /> Guardar
+                      <button onClick={handleSave} disabled={!form.nombre || form.precio_venta <= 0 || guardandoProducto}
+                        className="flex-1 bg-gorilla-purple hover:bg-purple-700 disabled:opacity-50 text-white p-4 rounded-xl font-black italic uppercase tracking-widest shadow-lg shadow-purple-200 transition-all active:scale-95 flex items-center justify-center gap-2">
+                        {guardandoProducto
+                          ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Guardando...</>
+                          : <><Save size={18} /> {isEditing ? 'Actualizar' : 'Guardar'}</>
+                        }
                       </button>
                     </div>
                   </div>

@@ -550,6 +550,12 @@ function TarifaCard({ tipo, icono, valores, onSave }: any) {
     setVals({ dia: valores?.precio_dia || 0, mes: valores?.precio_mes || 0 })
   }, [valores])
 
+  useEffect(() => {
+    if (!saved) return
+    const timer = setTimeout(() => setSaved(false), 2000)
+    return () => clearTimeout(timer) // limpia si el componente se desmonta antes
+  }, [saved])
+
   return (
     <div className="bg-slate-50 border border-slate-100 p-6 rounded-[1.5rem] hover:border-slate-200 transition-colors">
       <div className="flex items-center gap-4 mb-6">
@@ -561,7 +567,7 @@ function TarifaCard({ tipo, icono, valores, onSave }: any) {
         <MiniInput label="Mes" value={vals.mes} onChange={(v: number) => setVals({ ...vals, mes: v })} />
       </div>
       <button
-        onClick={() => { onSave(tipo, vals); setSaved(true); setTimeout(() => setSaved(false), 2000) }}
+        onClick={() => { onSave(tipo, vals); setSaved(true) }}
         className={`w-full mt-5 p-3.5 rounded-xl font-black uppercase text-[10px] tracking-widest flex items-center justify-center gap-2 transition-all ${saved ? 'bg-green-500 text-white' : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-900 hover:text-white'
           }`}>
         {saved ? <><Check size={16} /> Guardado</> : 'Actualizar tarifa'}

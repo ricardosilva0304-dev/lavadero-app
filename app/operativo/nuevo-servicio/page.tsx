@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { Car, Bike, User, Check, Zap, ShieldCheck, CheckCircle2, Phone } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -65,7 +65,7 @@ export default function NuevoServicioPage() {
     fetchMaestros()
   }, [])
 
-  const buscarCliente = async () => {
+  const buscarCliente = useCallback(async () => {
     if (!telefono.trim()) return
     setBuscandoCliente(true)
     try {
@@ -86,7 +86,7 @@ export default function NuevoServicioPage() {
     } finally {
       setBuscandoCliente(false)
     }
-  }
+  }, [telefono])
 
   // Búsqueda automática con debounce — dispara sola al escribir el teléfono
   useEffect(() => {
@@ -100,9 +100,9 @@ export default function NuevoServicioPage() {
     }
     const timer = setTimeout(() => {
       buscarCliente()
-    }, 600) // espera 600ms después de que el usuario deje de escribir
+    }, 600)
     return () => clearTimeout(timer)
-  }, [telefono])
+  }, [telefono, buscarCliente])
 
   const toggleServicio = (srv: any) => {
     setServiciosSeleccionados(prev =>

@@ -18,6 +18,8 @@ export default function HistorialPage() {
   const [filtroPago, setFiltroPago] = useState<'todos' | 'efectivo' | 'transferencia'>('todos')
   const [soloFinalizados, setSoloFinalizados] = useState(true)
   const [puedeEliminar, setPuedeEliminar] = useState(false)
+  const [confirmEliminar, setConfirmEliminar] = useState<string | null>(null)
+  const [eliminando, setEliminando] = useState(false)
 
   useEffect(() => {
     const userData = sessionStorage.getItem('gorilla_user')
@@ -50,8 +52,10 @@ export default function HistorialPage() {
   }, [fetchHistorial])
 
   const eliminarOrden = async (id: string) => {
-    if (!window.confirm('¿Estás seguro de eliminar este servicio?\n\nEsta acción es irreversible.')) return
+    setEliminando(true)
     await supabase.from('ordenes_servicio').delete().eq('id', id)
+    setConfirmEliminar(null)
+    setEliminando(false)
     // El realtime se encarga de refrescar automáticamente
   }
 
@@ -234,7 +238,7 @@ export default function HistorialPage() {
                               ${(parseFloat(o.total) || 0).toLocaleString('es-CO')}
                             </span>
                             {puedeEliminar && (
-                              <button onClick={() => eliminarOrden(o.id)}
+                              <button onClick={() => setConfirmEliminar(o.id)}
                                 className="p-2.5 text-slate-300 hover:text-red-500 hover:bg-red-50 rounded-xl transition-all shrink-0">
                                 <Trash2 size={17} />
                               </button>
@@ -266,6 +270,37 @@ export default function HistorialPage() {
         )}
 
       </div>
+
+      {/* MODAL CONFIRMAR ELIMINACIÓN */}
+      <AnimatePresence>
+        {confirmEliminar && (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+            <motion.div initial={{ scale: 0.95, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white rounded-[2rem] p-7 sm:p-8 max-w-sm w-full shadow-2xl relative overflow-hidden">
+              <div className="absolute top-0 left-0 w-full h-1.5 bg-red-500" />
+              <div className="flex flex-col items-center text-center mb-6 pt-2">
+                <div className="w-14 h-14 bg-red-50 rounded-2xl flex items-center justify-center mb-4">
+                  <Trash2 className="text-red-500" size={26} />
+                </div>
+                <h2 className="text-lg font-black italic uppercase text-slate-900 leading-tight">¿Eliminar registro?</h2>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-2">Esta acción es irreversible</p>
+              </div>
+              <div className="flex gap-3">
+                <button onClick={() => setConfirmEliminar(null)} disabled={eliminando}
+                  className="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 py-3.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all disabled:opacity-50">
+                  Cancelar
+                </button>
+                <button onClick={() => eliminarOrden(confirmEliminar)} disabled={eliminando}
+                  className="flex-1 bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white py-3.5 rounded-xl font-black text-xs uppercase tracking-widest transition-all active:scale-95 flex items-center justify-center gap-2">
+                  {eliminando
+                    ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Eliminando...</>
+                    : <><Trash2 size={14} /> Eliminar</>}
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   )
 }

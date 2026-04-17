@@ -25,7 +25,7 @@ export default function ReportesPage() {
         setLoading(true)
         let query: any
         if (activeTab === 'ventas') {
-            query = supabase.from('ordenes_servicio').select('*, empleado:perfiles!empleado_id(nombre)').order('creado_en', { ascending: false })
+            query = supabase.from('ordenes_servicio').select('*, empleado:perfiles!empleado_id(nombre)').eq('estado', 'cobrado').order('creado_en', { ascending: false })
         } else if (activeTab === 'inventario') {
             query = supabase.from('productos').select('*').order('stock', { ascending: true })
         } else {

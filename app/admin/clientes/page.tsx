@@ -6,6 +6,8 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { type Rol, puedeCRUD } from '@/utils/roles'
 import { useRouter } from 'next/navigation'
 
+export const dynamic = 'force-dynamic'
+
 export default function BaseClientesPage() {
   const supabase = createClient()
   const router = useRouter()
@@ -13,6 +15,8 @@ export default function BaseClientesPage() {
   const [busqueda, setBusqueda] = useState('')
   const [loading, setLoading] = useState(true)
   const [editando, setEditando] = useState<any>(null)
+  const [errorEditar, setErrorEditar] = useState('')
+  const [guardando, setGuardando] = useState(false)
   const [puedeEditar, setPuedeEditar] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState<any>(null)
 
@@ -58,11 +62,19 @@ export default function BaseClientesPage() {
 
   const actualizarCliente = async (e: React.FormEvent) => {
     e.preventDefault()
+    setGuardando(true)
+    setErrorEditar('')
     const { error } = await supabase
       .from('clientes')
       .update({ nombre: editando.nombre, telefono: editando.telefono, cedula: editando.cedula })
       .eq('id', editando.id)
-    if (!error) setEditando(null)
+    if (!error) {
+      setEditando(null)
+    } else {
+      if (error.code === '23505') setErrorEditar('Ya existe un cliente con ese teléfono o cédula.')
+      else setErrorEditar('No se pudo guardar. Intenta de nuevo.')
+    }
+    setGuardando(false)
   }
 
   const clientesFiltrados = clientes.filter(c =>
@@ -293,7 +305,7 @@ export default function BaseClientesPage() {
                     <h2 className="text-xl font-black italic uppercase text-slate-900 leading-none">Editar Cliente</h2>
                     <p className="text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-1">Actualización de datos</p>
                   </div>
-                  <button onClick={() => setEditando(null)} className="p-2 bg-slate-100 rounded-xl text-slate-500 hover:bg-slate-200 transition-colors">
+                  <button onClick={() => { setEditando(null); setErrorEditar('') }} className="p-2 bg-slate-100 rounded-xl text-slate-500 hover:bg-slate-200 transition-colors">
                     <X size={18} />
                   </button>
                 </div>
@@ -324,9 +336,16 @@ export default function BaseClientesPage() {
                       />
                     </div>
                   </div>
-                  <button type="submit"
-                    className="w-full bg-slate-900 hover:bg-black text-white py-4 rounded-xl font-black uppercase tracking-widest text-sm transition-all active:scale-95 mt-2">
-                    Guardar Cambios
+                  {errorEditar && (
+                    <p className="text-red-500 text-xs font-bold bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+                      ⚠️ {errorEditar}
+                    </p>
+                  )}
+                  <button type="submit" disabled={guardando}
+                    className="w-full bg-slate-900 hover:bg-black disabled:opacity-50 text-white py-4 rounded-xl font-black uppercase tracking-widest text-sm transition-all active:scale-95 mt-2 flex items-center justify-center gap-2">
+                    {guardando
+                      ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Guardando...</>
+                      : 'Guardar Cambios'}
                   </button>
                 </form>
               </div>
